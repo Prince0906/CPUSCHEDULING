@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Simplified color palette */
+  --background: #FAFBFC;
+  --foreground: #1a1a2e;
+  --card: #FFFFFF;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --muted: #6B7280;
+  --muted-light: #9CA3AF;
+  
+  /* Single primary color */
+  --primary: #0EA5E9;
+  --primary-hover: #0284C7;
+  
+  /* Minimal accent colors */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  
+  /* Generous spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* Clean card - minimal shadow */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Simple section header */
+  .section-header {
+    @apply px-6 py-5 border-b border-gray-100;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold text-gray-900 uppercase tracking-wide;
+  }
+
+  /* Clean badge */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  /* Clean buttons */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply bg-sky-500 text-white rounded-xl;
+    @apply hover:bg-sky-600;
+    @apply active:bg-sky-700;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 rounded-xl;
+    @apply hover:bg-gray-200;
+  }
+
+  /* Clean inputs */
+  .input {
+    @apply w-full px-4 py-3 bg-gray-50 border-0 rounded-xl;
+    @apply text-gray-900 placeholder-gray-400;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-label {
+    @apply block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2;
+  }
+
+  /* Process state badges - minimal */
+  .state-ready { @apply bg-sky-50 text-sky-700; }
+  .state-running { @apply bg-emerald-50 text-emerald-700; }
+  .state-waiting { @apply bg-amber-50 text-amber-700; }
+  .state-completed { @apply bg-gray-100 text-gray-600; }
+  .state-new { @apply bg-gray-50 text-gray-500; }
+
+  /* Gantt bar */
+  .gantt-bar {
+    @apply h-full flex items-center justify-center text-white text-xs font-medium;
+    @apply transition-transform duration-200;
+    border-radius: 4px;
+  }
+
+  .gantt-bar:hover {
+    transform: scaleY(1.1);
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-full rounded-full transition-all duration-300;
+  }
+}
+
+/* Clean scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Minimal animation */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
