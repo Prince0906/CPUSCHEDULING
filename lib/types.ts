@@ -170,6 +170,9 @@ export interface SimulationState {
   currentQuantum: number; // For Round Robin - tracks time in current quantum
 }
 
+// Import analysis types
+import type { AnalysisResult } from './analysis/types';
+
 // Main scheduler store state
 export interface SchedulerState {
   // Algorithm selection
@@ -198,6 +201,15 @@ export interface SchedulerState {
   compareAlgorithms: AlgorithmType[];
   compareResults: SimulationResult[];
   
+  // Analysis state
+  analysisResult: AnalysisResult | null;
+  isAnalyzing: boolean;
+  analysisError: string | null;
+  
+  // Recommended algorithm comparison
+  recommendedResult: SimulationResult | null;
+  isRunningRecommended: boolean;
+  
   // Actions
   setAlgorithm: (algorithm: AlgorithmType) => void;
   setTimeQuantum: (quantum: number) => void;
@@ -217,6 +229,14 @@ export interface SchedulerState {
   toggleCompareMode: () => void;
   setCompareAlgorithms: (algorithms: AlgorithmType[]) => void;
   runComparison: () => void;
+  
+  // Analysis actions
+  runAnalysis: () => Promise<void>;
+  clearAnalysis: () => void;
+  
+  // Recommended algorithm actions
+  runRecommendedAlgorithm: () => void;
+  switchToRecommendedAlgorithm: () => void;
   
   // Internal simulation methods
   tick: () => void;

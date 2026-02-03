@@ -55,6 +55,11 @@ export function executeTick(
   let completedProcesses = [...state.completedProcesses];
   let ganttChart = [...state.ganttChart];
   let currentQuantum = state.currentQuantum;
+  
+  // Track which process executed this tick for accurate Gantt chart
+  let executedProcessId: string | null = null;
+  let executedProcessName: string = '';
+  let executedProcessColor: string = '';
 
   // 1. Check for newly arrived processes and add to ready queue
   processes = processes.map((p) => {
@@ -124,11 +129,39 @@ export function executeTick(
     }
   }
 
-  // 4. Handle running process (if not preempted)
-  if (runningProcess && !wasPreempted) {
+  // 4. If CPU is idle (or was just preempted) and ready queue has processes, dispatch next process
+  if (!runningProcess && readyQueue.length > 0) {
+    const nextProcessId = scheduler.selectNextProcess(readyQueue, processes);
+    
+    if (nextProcessId) {
+      readyQueue = readyQueue.filter(id => id !== nextProcessId);
+      const nextProcessIdx = processes.findIndex((p) => p.id === nextProcessId);
+      
+      if (nextProcessIdx !== -1) {
+        const nextProcess = processes[nextProcessIdx];
+        processes[nextProcessIdx] = {
+          ...nextProcess,
+          state: 'running' as const,
+          startTime: nextProcess.startTime ?? currentTime,
+          responseTime: nextProcess.responseTime ?? (currentTime - nextProcess.arrivalTime),
+        };
+        runningProcess = nextProcessId;
+        currentQuantum = 0;
+      }
+    }
+  }
+
+  // 5. Handle running process - execute one unit of CPU time
+  if (runningProcess) {
     const runningIdx = processes.findIndex((p) => p.id === runningProcess);
     if (runningIdx !== -1) {
       const process = processes[runningIdx];
+      
+      // Record this process as executing this tick (before any state changes)
+      executedProcessId = process.id;
+      executedProcessName = process.name;
+      executedProcessColor = process.color;
+      
       const newRemainingCpu = process.remainingCpuTime - 1;
       currentQuantum++;
       
@@ -164,28 +197,6 @@ export function executeTick(
     }
   }
 
-  // 5. If CPU is idle and ready queue has processes, dispatch next process
-  if (!runningProcess && readyQueue.length > 0) {
-    const nextProcessId = scheduler.selectNextProcess(readyQueue, processes);
-    
-    if (nextProcessId) {
-      readyQueue = readyQueue.filter(id => id !== nextProcessId);
-      const nextProcessIdx = processes.findIndex((p) => p.id === nextProcessId);
-      
-      if (nextProcessIdx !== -1) {
-        const nextProcess = processes[nextProcessIdx];
-        processes[nextProcessIdx] = {
-          ...nextProcess,
-          state: 'running' as const,
-          startTime: nextProcess.startTime ?? currentTime,
-          responseTime: nextProcess.responseTime ?? (currentTime - nextProcess.arrivalTime),
-        };
-        runningProcess = nextProcessId;
-        currentQuantum = 0;
-      }
-    }
-  }
-
   // 6. Increment waiting time for processes in ready queue
   processes = processes.map((p) => {
     if (p.state === 'ready' && readyQueue.includes(p.id)) {
@@ -194,27 +205,25 @@ export function executeTick(
     return p;
   });
 
-  // 7. Record Gantt chart entry
-  if (runningProcess) {
-    const runningProcessObj = processes.find((p) => p.id === runningProcess);
-    if (runningProcessObj) {
-      const lastEntry = ganttChart[ganttChart.length - 1];
-      if (lastEntry && lastEntry.processId === runningProcess && !lastEntry.isPreempted) {
-        ganttChart[ganttChart.length - 1] = {
-          ...lastEntry,
-          endTime: currentTime + 1,
-        };
-      } else {
-        ganttChart.push({
-          processId: runningProcess,
-          processName: runningProcessObj.name,
-          startTime: currentTime,
-          endTime: currentTime + 1,
-          color: runningProcessObj.color,
-        });
-      }
+  // 7. Record Gantt chart entry based on what actually executed this tick
+  if (executedProcessId) {
+    const lastEntry = ganttChart[ganttChart.length - 1];
+    if (lastEntry && lastEntry.processId === executedProcessId && !lastEntry.isPreempted) {
+      ganttChart[ganttChart.length - 1] = {
+        ...lastEntry,
+        endTime: currentTime + 1,
+      };
+    } else {
+      ganttChart.push({
+        processId: executedProcessId,
+        processName: executedProcessName,
+        startTime: currentTime,
+        endTime: currentTime + 1,
+        color: executedProcessColor,
+      });
     }
   } else {
+    // CPU was idle this tick
     const lastEntry = ganttChart[ganttChart.length - 1];
     if (lastEntry && lastEntry.processId === null) {
       ganttChart[ganttChart.length - 1] = {

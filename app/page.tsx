@@ -9,9 +9,11 @@ import IOQueue from '@/components/IOQueue';
 import CompletedProcesses from '@/components/CompletedProcesses';
 import GanttChart from '@/components/GanttChart';
 import Controls from '@/components/Controls';
+import ProcessTable from '@/components/ProcessTable';
 import Statistics from '@/components/Statistics';
 import AlgorithmInfo from '@/components/AlgorithmInfo';
 import CompareMode from '@/components/CompareMode';
+import FlawAnalysis from '@/components/FlawAnalysis';
 
 export default function Home() {
   const { isCompareMode } = useSchedulerStore();
@@ -19,7 +21,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAFBFC]">
       <Header />
-      
+
       <main className="max-w-[1400px] mx-auto px-6 lg:px-8 py-8">
         <div className="flex gap-8">
           {/* Left sidebar */}
@@ -60,8 +62,14 @@ export default function Home() {
                 {/* Gantt Chart */}
                 <GanttChart />
 
+                {/* Process Details Table */}
+                <ProcessTable />
+
                 {/* Statistics */}
                 <Statistics />
+
+                {/* AI Flaw Analysis */}
+                <FlawAnalysis />
               </>
             )}
           </div>

@@ -10,7 +10,7 @@ export default function CPUCore() {
     ? processes.find(p => p.id === runningProcess) 
     : null;
 
-  const progress = activeProcess 
+  const progress = activeProcess && activeProcess.cpuBurstTime > 0
     ? ((activeProcess.cpuBurstTime - activeProcess.remainingCpuTime) / activeProcess.cpuBurstTime) * 100
     : 0;
 
@@ -93,14 +93,19 @@ export default function CPUCore() {
       {/* Quantum indicator for Round Robin */}
       {isRoundRobin && activeProcess && (
         <div className="px-6 pb-6">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-            <span>Time Quantum</span>
-            <span className="font-medium text-gray-700">{currentQuantum}/{timeQuantum}ms</span>
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-gray-500">Time Quantum</span>
+            <span className={`font-medium ${currentQuantum >= timeQuantum ? 'text-amber-600' : 'text-gray-700'}`}>
+              {currentQuantum}/{timeQuantum}ms
+              {currentQuantum >= timeQuantum && (
+                <span className="ml-1 text-amber-600">(preempt next)</span>
+              )}
+            </span>
           </div>
-          <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-amber-400 rounded-full"
-              animate={{ width: `${(currentQuantum / timeQuantum) * 100}%` }}
+              className={`h-full rounded-full ${currentQuantum >= timeQuantum ? 'bg-amber-500' : 'bg-amber-400'}`}
+              animate={{ width: `${Math.min((currentQuantum / timeQuantum) * 100, 100)}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>

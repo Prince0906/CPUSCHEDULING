@@ -96,7 +96,10 @@ export default function Controls() {
                 max="10"
                 value={timeQuantum}
                 onChange={(e) => setTimeQuantum(parseInt(e.target.value))}
-                className="w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                disabled={playbackState !== 'stopped'}
+                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500 ${
+                  playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
               <span className="text-sm font-medium text-gray-700 w-8">{timeQuantum}ms</span>
             </div>
