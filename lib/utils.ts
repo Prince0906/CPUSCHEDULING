@@ -22,7 +22,7 @@ export function calculateStatistics(
   ganttChart: GanttEntry[]
 ): Statistics {
   const completedProcesses = processes.filter(p => p.state === 'terminated');
-  
+
   if (completedProcesses.length === 0) {
     return {
       avgWaitingTime: 0,
@@ -98,6 +98,7 @@ export function createProcess(
     responseTime: null,
     color: getProcessColor(colorIndex),
     priority: input.priority,
+    queueLevel: input.queueLevel ?? 1,
   };
 }
 
@@ -123,5 +124,6 @@ export function cloneProcessesForSimulation(processes: Process[]): Process[] {
     completionTime: null,
     waitingTime: 0,
     responseTime: null,
+    queueLevel: p.queueLevel ?? 1, // Reset MLFQ queue level
   }));
 }

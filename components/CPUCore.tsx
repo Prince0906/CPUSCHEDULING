@@ -2,12 +2,14 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSchedulerStore } from '@/lib/store';
+import { MLQ_QUANTA } from '@/lib/schedulers/mlq';
+import { MLFQ_QUANTA } from '@/lib/schedulers/mlfq';
 
 export default function CPUCore() {
-  const { processes, runningProcess, algorithm, timeQuantum, currentQuantum } = useSchedulerStore();
-  
-  const activeProcess = runningProcess 
-    ? processes.find(p => p.id === runningProcess) 
+  const { processes, runningProcess, algorithm, timeQuantum: globalQuantum, currentQuantum } = useSchedulerStore();
+
+  const activeProcess = runningProcess
+    ? processes.find(p => p.id === runningProcess)
     : null;
 
   const progress = activeProcess && activeProcess.cpuBurstTime > 0
@@ -15,13 +17,36 @@ export default function CPUCore() {
     : 0;
 
   const isRoundRobin = algorithm === 'rr';
+  const isMultiLevel = algorithm === 'mlq' || algorithm === 'mlfq';
+
+  // Determine relevant time quantum for display
+  let activeQuantum = globalQuantum;
+  let showQuantum = isRoundRobin;
+
+  if (activeProcess && isMultiLevel) {
+    const level = activeProcess.queueLevel ?? 1;
+    if (algorithm === 'mlq') {
+      activeQuantum = MLQ_QUANTA[level] ?? globalQuantum;
+      showQuantum = activeQuantum !== Infinity; // Don't show for FCFS queue
+    } else if (algorithm === 'mlfq') {
+      activeQuantum = MLFQ_QUANTA[level] ?? 8;
+      showQuantum = true;
+    }
+  }
 
   return (
     <div className="card h-full flex flex-col">
       <div className="section-header flex items-center justify-between">
         <h2 className="section-title">CPU</h2>
         {activeProcess && (
-          <span className="text-xs text-emerald-600 font-medium">Active</span>
+          <div className="flex items-center gap-2">
+            {isMultiLevel && (
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                Q{activeProcess.queueLevel ?? 1}
+              </span>
+            )}
+            <span className="text-xs text-emerald-600 font-medium">Active</span>
+          </div>
         )}
       </div>
 
@@ -65,7 +90,7 @@ export default function CPUCore() {
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="text-center"
                 >
-                  <div 
+                  <div
                     className="text-3xl font-bold"
                     style={{ color: activeProcess.color }}
                   >
@@ -90,22 +115,24 @@ export default function CPUCore() {
         </div>
       </div>
 
-      {/* Quantum indicator for Round Robin */}
-      {isRoundRobin && activeProcess && (
+      {/* Quantum indicator */}
+      {showQuantum && activeProcess && (
         <div className="px-6 pb-6">
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-gray-500">Time Quantum</span>
-            <span className={`font-medium ${currentQuantum >= timeQuantum ? 'text-amber-600' : 'text-gray-700'}`}>
-              {currentQuantum}/{timeQuantum}ms
-              {currentQuantum >= timeQuantum && (
-                <span className="ml-1 text-amber-600">(preempt next)</span>
+            <span className="text-gray-500">Quantum (Q{activeProcess.queueLevel ?? 1})</span>
+            <span className={`font-medium ${currentQuantum >= activeQuantum ? 'text-amber-600' : 'text-gray-700'}`}>
+              {currentQuantum}/{activeQuantum}ms
+              {currentQuantum >= activeQuantum && (
+                <span className="ml-1 text-amber-600">
+                  ({algorithm === 'mlfq' ? 'demote' : 'preempt'})
+                </span>
               )}
             </span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <motion.div
-              className={`h-full rounded-full ${currentQuantum >= timeQuantum ? 'bg-amber-500' : 'bg-amber-400'}`}
-              animate={{ width: `${Math.min((currentQuantum / timeQuantum) * 100, 100)}%` }}
+              className={`h-full rounded-full ${currentQuantum >= activeQuantum ? 'bg-amber-500' : 'bg-amber-400'}`}
+              animate={{ width: `${Math.min((currentQuantum / activeQuantum) * 100, 100)}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>

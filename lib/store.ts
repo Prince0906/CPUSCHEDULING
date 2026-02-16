@@ -1,11 +1,11 @@
 'use client';
 
 import { create } from 'zustand';
-import { 
-  Process, 
-  AlgorithmType, 
-  PlaybackState, 
-  SpeedOption, 
+import {
+  Process,
+  AlgorithmType,
+  PlaybackState,
+  SpeedOption,
   SchedulerState,
   SimulationResult,
   ProcessInput,
@@ -21,34 +21,34 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Algorithm selection
   algorithm: 'fcfs',
   timeQuantum: 2,
-  
+
   // Process management
   processes: [],
   readyQueue: [],
   ioQueue: [],
   runningProcess: null,
   completedProcesses: [],
-  
+
   // Simulation state
   currentTime: 0,
   playbackState: 'stopped',
   speed: 1,
   isSimulationComplete: false,
   currentQuantum: 0,
-  
+
   // Gantt chart data
   ganttChart: [],
-  
+
   // Comparison mode
   isCompareMode: false,
   compareAlgorithms: ['fcfs', 'sjf'],
   compareResults: [],
-  
+
   // Analysis state
   analysisResult: null,
   isAnalyzing: false,
   analysisError: null,
-  
+
   // Recommended algorithm comparison
   recommendedResult: null,
   isRunningRecommended: false,
@@ -72,7 +72,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   addProcess: (input) => {
     const state = get();
     const newProcess = createProcess(input as ProcessInput, state.processes.length);
-    set({ 
+    set({
       processes: [...state.processes, newProcess],
       // Clear analysis when processes change
       analysisResult: null,
@@ -84,7 +84,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Remove a process
   removeProcess: (id) => {
     const state = get();
-    set({ 
+    set({
       processes: state.processes.filter((p) => p.id !== id),
       // Clear analysis when processes change
       analysisResult: null,
@@ -124,10 +124,10 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     if (state.playbackState === 'playing') {
       get().pause();
     }
-    
+
     const exampleData = getExampleProcesses();
     const newProcesses = exampleData.map((data, index) => createProcess(data, index));
-    
+
     set({
       processes: newProcesses,
       readyQueue: [],
@@ -151,12 +151,12 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   play: () => {
     const state = get();
     if (state.isSimulationComplete || state.processes.length === 0) return;
-    
+
     set({ playbackState: 'playing' });
-    
+
     const baseInterval = 1000;
     const interval = baseInterval / state.speed;
-    
+
     intervalId = setInterval(() => {
       get().tick();
     }, interval);
@@ -188,7 +188,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       clearInterval(intervalId);
       intervalId = null;
     }
-    
+
     // Reset all processes to initial state
     const resetProcesses = state.processes.map((p) => ({
       ...p,
@@ -199,8 +199,9 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       completionTime: null,
       waitingTime: 0,
       responseTime: null,
+      queueLevel: p.queueLevel ?? 1,
     }));
-    
+
     set({
       processes: resetProcesses,
       readyQueue: [],
@@ -223,15 +224,15 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   setSpeed: (speed) => {
     const state = get();
     set({ speed });
-    
+
     if (state.playbackState === 'playing') {
       if (intervalId) {
         clearInterval(intervalId);
       }
-      
+
       const baseInterval = 1000;
       const interval = baseInterval / speed;
-      
+
       intervalId = setInterval(() => {
         get().tick();
       }, interval);
@@ -245,7 +246,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       get().pause();
     }
     get().reset();
-    set({ 
+    set({
       isCompareMode: !state.isCompareMode,
       compareResults: [],
     });
@@ -260,19 +261,19 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   runComparison: () => {
     const state = get();
     if (state.processes.length === 0) return;
-    
+
     const results: SimulationResult[] = [];
-    
+
     for (const algorithm of state.compareAlgorithms) {
       const clonedProcesses = cloneProcessesForSimulation(state.processes);
       const finalState = runFullSimulation(clonedProcesses, algorithm, state.timeQuantum);
-      
+
       const stats = calculateStatistics(
-        finalState.processes, 
-        finalState.currentTime, 
+        finalState.processes,
+        finalState.currentTime,
         finalState.ganttChart
       );
-      
+
       results.push({
         algorithm,
         ganttChart: finalState.ganttChart,
@@ -281,31 +282,31 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         totalTime: finalState.currentTime,
       });
     }
-    
+
     set({ compareResults: results });
   },
 
   // Run AI analysis on completed simulation
   runAnalysis: async () => {
     const state = get();
-    
+
     // Guard: Don't run if already analyzing (prevents concurrent calls)
     if (state.isAnalyzing) {
       return;
     }
-    
+
     // Guard: Simulation must be complete with processes
     // Don't set error here - this can happen if user resets during auto-analysis delay
     if (!state.isSimulationComplete || state.processes.length === 0) {
       return;
     }
-    
+
     // Don't check for API key upfront - let analyzeSimulation try env key first
     set({ isAnalyzing: true, analysisError: null, analysisResult: null });
-    
+
     try {
       const stats = calculateStatistics(state.processes, state.currentTime, state.ganttChart);
-      
+
       const simulationData = prepareSimulationData(
         state.algorithm,
         state.processes.map(p => ({
@@ -322,10 +323,10 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         stats,
         state.algorithm === 'rr' ? state.timeQuantum : undefined
       );
-      
+
       const result = await analyzeSimulation(simulationData);
       set({ analysisResult: result, isAnalyzing: false });
-      
+
       // Auto-run recommended algorithm for comparison if available
       if (result.bestAlternative && result.bestAlternative.algorithm !== state.algorithm) {
         // Small delay to let UI update first
@@ -334,7 +335,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         }, 50);
       }
     } catch (error) {
-      set({ 
+      set({
         analysisError: error instanceof Error ? error.message : 'Analysis failed. Please try again.',
         isAnalyzing: false,
       });
@@ -349,31 +350,31 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Run recommended algorithm simulation for comparison
   runRecommendedAlgorithm: () => {
     const state = get();
-    
+
     // Need analysis result with a best alternative
     if (!state.analysisResult?.bestAlternative) {
       return;
     }
-    
+
     const recommendedAlgo = state.analysisResult.bestAlternative.algorithm;
-    
+
     // Don't run if same as current algorithm
     if (recommendedAlgo === state.algorithm) {
       return;
     }
-    
+
     set({ isRunningRecommended: true });
-    
+
     // Clone processes and run full simulation with recommended algorithm
     const clonedProcesses = cloneProcessesForSimulation(state.processes);
     const finalState = runFullSimulation(clonedProcesses, recommendedAlgo, state.timeQuantum);
-    
+
     const stats = calculateStatistics(
       finalState.processes,
       finalState.currentTime,
       finalState.ganttChart
     );
-    
+
     const result: SimulationResult = {
       algorithm: recommendedAlgo,
       ganttChart: finalState.ganttChart,
@@ -381,27 +382,27 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       processStats: getProcessStats(finalState.processes),
       totalTime: finalState.currentTime,
     };
-    
+
     set({ recommendedResult: result, isRunningRecommended: false });
   },
 
   // Switch to the recommended algorithm and reset simulation
   switchToRecommendedAlgorithm: () => {
     const state = get();
-    
+
     if (!state.analysisResult?.bestAlternative) {
       return;
     }
-    
+
     const recommendedAlgo = state.analysisResult.bestAlternative.algorithm;
-    
+
     // Clear analysis and recommended results
-    set({ 
-      analysisResult: null, 
-      analysisError: null, 
+    set({
+      analysisResult: null,
+      analysisError: null,
       recommendedResult: null,
     });
-    
+
     // Set the new algorithm and reset
     get().setAlgorithm(recommendedAlgo);
   },
@@ -409,7 +410,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Main simulation tick
   tick: () => {
     const state = get();
-    
+
     const simulationState = {
       processes: state.processes,
       readyQueue: state.readyQueue,
@@ -421,9 +422,9 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       isComplete: state.isSimulationComplete,
       currentQuantum: state.currentQuantum,
     };
-    
+
     const newState = executeTick(simulationState, state.algorithm, state.timeQuantum);
-    
+
     if (newState.isComplete) {
       if (intervalId) {
         clearInterval(intervalId);
@@ -441,13 +442,13 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         playbackState: 'stopped',
         currentQuantum: newState.currentQuantum,
       });
-      
+
       // Automatically run AI analysis after simulation completes
       // Use setTimeout to ensure state is fully updated before analysis starts
       setTimeout(() => {
         get().runAnalysis();
       }, 100);
-      
+
       return;
     }
 

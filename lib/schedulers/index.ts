@@ -4,16 +4,18 @@ import { sjfScheduler } from './sjf';
 import { srtfScheduler } from './srtf';
 import { priorityScheduler, priorityPreemptiveScheduler } from './priority';
 import { roundRobinScheduler } from './roundRobin';
+import { mlqScheduler, MLQ_QUANTA } from './mlq';
+import { mlfqScheduler, MLFQ_QUANTA, MLFQ_MAX_LEVEL } from './mlfq';
 
 // Scheduler interface that all algorithms implement
 export interface Scheduler {
   id: AlgorithmType;
   name: string;
   isPreemptive: boolean;
-  
+
   // Select the next process to run from ready queue
   selectNextProcess: (readyQueue: string[], processes: Process[]) => string | null;
-  
+
   // Check if current process should be preempted
   shouldPreempt: (
     currentProcess: Process | null,
@@ -32,6 +34,8 @@ const schedulers: Record<AlgorithmType, Scheduler> = {
   priority: priorityScheduler,
   'priority-preemptive': priorityPreemptiveScheduler,
   rr: roundRobinScheduler,
+  mlq: mlqScheduler,
+  mlfq: mlfqScheduler,
 };
 
 // Get scheduler by algorithm type
@@ -47,7 +51,7 @@ export function executeTick(
 ): SimulationState {
   const scheduler = getScheduler(algorithm);
   const currentTime = state.currentTime;
-  
+
   let processes = [...state.processes];
   let readyQueue = [...state.readyQueue];
   let ioQueue = [...state.ioQueue];
@@ -55,7 +59,7 @@ export function executeTick(
   let completedProcesses = [...state.completedProcesses];
   let ganttChart = [...state.ganttChart];
   let currentQuantum = state.currentQuantum;
-  
+
   // Track which process executed this tick for accurate Gantt chart
   let executedProcessId: string | null = null;
   let executedProcessName: string = '';
@@ -80,9 +84,9 @@ export function executeTick(
         if (p.remainingCpuTime > 0) {
           return { ...p, remainingIoTime: 0, state: 'ready' as const };
         } else {
-          return { 
-            ...p, 
-            remainingIoTime: 0, 
+          return {
+            ...p,
+            remainingIoTime: 0,
             state: 'terminated' as const,
             completionTime: currentTime + 1,
           };
@@ -112,10 +116,21 @@ export function executeTick(
       // Preempt current process - move back to ready queue
       const runningIdx = processes.findIndex(p => p.id === runningProcess);
       if (runningIdx !== -1) {
-        processes[runningIdx] = { ...processes[runningIdx], state: 'ready' as const };
+        let newQueueLevel = processes[runningIdx].queueLevel;
+
+        // MLFQ demotion: if quantum exhausted, demote to next lower queue
+        if (algorithm === 'mlfq') {
+          const currentLevel = processes[runningIdx].queueLevel ?? 1;
+          const queueQuantum = MLFQ_QUANTA[currentLevel] ?? 8;
+          if (currentQuantum >= queueQuantum && currentLevel < MLFQ_MAX_LEVEL) {
+            newQueueLevel = currentLevel + 1;
+          }
+        }
+
+        processes[runningIdx] = { ...processes[runningIdx], state: 'ready' as const, queueLevel: newQueueLevel };
         readyQueue.push(runningProcess);
         wasPreempted = true;
-        
+
         // Mark the last gantt entry as preempted
         if (ganttChart.length > 0) {
           ganttChart[ganttChart.length - 1] = {
@@ -132,11 +147,11 @@ export function executeTick(
   // 4. If CPU is idle (or was just preempted) and ready queue has processes, dispatch next process
   if (!runningProcess && readyQueue.length > 0) {
     const nextProcessId = scheduler.selectNextProcess(readyQueue, processes);
-    
+
     if (nextProcessId) {
       readyQueue = readyQueue.filter(id => id !== nextProcessId);
       const nextProcessIdx = processes.findIndex((p) => p.id === nextProcessId);
-      
+
       if (nextProcessIdx !== -1) {
         const nextProcess = processes[nextProcessIdx];
         processes[nextProcessIdx] = {
@@ -156,30 +171,30 @@ export function executeTick(
     const runningIdx = processes.findIndex((p) => p.id === runningProcess);
     if (runningIdx !== -1) {
       const process = processes[runningIdx];
-      
+
       // Record this process as executing this tick (before any state changes)
       executedProcessId = process.id;
       executedProcessName = process.name;
       executedProcessColor = process.color;
-      
+
       const newRemainingCpu = process.remainingCpuTime - 1;
       currentQuantum++;
-      
+
       if (newRemainingCpu <= 0) {
         // CPU burst complete
         if (process.remainingIoTime > 0) {
           // Move to I/O queue
-          processes[runningIdx] = { 
-            ...process, 
-            remainingCpuTime: 0, 
-            state: 'waiting' as const 
+          processes[runningIdx] = {
+            ...process,
+            remainingCpuTime: 0,
+            state: 'waiting' as const
           };
           ioQueue.push(process.id);
         } else {
           // Process complete
-          processes[runningIdx] = { 
-            ...process, 
-            remainingCpuTime: 0, 
+          processes[runningIdx] = {
+            ...process,
+            remainingCpuTime: 0,
             state: 'terminated' as const,
             completionTime: currentTime + 1,
           };
@@ -189,9 +204,9 @@ export function executeTick(
         currentQuantum = 0;
       } else {
         // Continue running
-        processes[runningIdx] = { 
-          ...process, 
-          remainingCpuTime: newRemainingCpu 
+        processes[runningIdx] = {
+          ...process,
+          remainingCpuTime: newRemainingCpu
         };
       }
     }
@@ -292,7 +307,7 @@ export function runFullSimulation(
   // Run simulation until complete (with safety limit)
   const maxIterations = 10000;
   let iterations = 0;
-  
+
   while (!state.isComplete && iterations < maxIterations) {
     state = executeTick(state, algorithm, timeQuantum);
     iterations++;
