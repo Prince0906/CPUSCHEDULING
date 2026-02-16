@@ -4,18 +4,18 @@ import { Cpu } from 'lucide-react';
 import { useSchedulerStore } from '@/lib/store';
 import { ALGORITHMS, AlgorithmType } from '@/lib/types';
 
-const algorithms: AlgorithmType[] = ['fcfs', 'sjf', 'srtf', 'priority', 'priority-preemptive', 'rr'];
+const algorithms: AlgorithmType[] = ['fcfs', 'sjf', 'srtf', 'priority', 'priority-preemptive', 'rr', 'mlq', 'mlfq'];
 
 export default function Header() {
-  const { 
-    currentTime, 
-    algorithm, 
-    setAlgorithm, 
-    isCompareMode, 
+  const {
+    currentTime,
+    algorithm,
+    setAlgorithm,
+    isCompareMode,
     toggleCompareMode,
-    playbackState 
+    playbackState
   } = useSchedulerStore();
-  
+
   const isRunning = playbackState !== 'stopped';
 
   return (
@@ -37,17 +37,16 @@ export default function Header() {
             {algorithms.map((algo) => {
               const info = ALGORITHMS[algo];
               const isSelected = algorithm === algo && !isCompareMode;
-              
+
               return (
                 <button
                   key={algo}
                   onClick={() => !isRunning && !isCompareMode && setAlgorithm(algo)}
                   disabled={isRunning || isCompareMode}
-                  className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                    isSelected
+                  className={`px-3 py-2 text-sm font-medium transition-colors relative ${isSelected
                       ? 'text-sky-600'
                       : 'text-gray-500 hover:text-gray-900'
-                  } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {info.shortName}
                   {isSelected && (
@@ -56,17 +55,16 @@ export default function Header() {
                 </button>
               );
             })}
-            
+
             <div className="w-px h-6 bg-gray-200 mx-2" />
-            
+
             <button
               onClick={() => !isRunning && toggleCompareMode()}
               disabled={isRunning}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                isCompareMode
+              className={`px-3 py-2 text-sm font-medium transition-colors ${isCompareMode
                   ? 'text-sky-600'
                   : 'text-gray-500 hover:text-gray-900'
-              } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Compare
             </button>

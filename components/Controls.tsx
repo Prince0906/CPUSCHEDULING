@@ -8,25 +8,25 @@ import { SpeedOption } from '@/lib/types';
 const speeds: SpeedOption[] = [0.5, 1, 2, 4];
 
 export default function Controls() {
-  const { 
-    playbackState, 
-    speed, 
+  const {
+    playbackState,
+    speed,
     isSimulationComplete,
     processes,
     algorithm,
     timeQuantum,
     setTimeQuantum,
-    play, 
-    pause, 
-    step, 
-    reset, 
-    setSpeed 
+    play,
+    pause,
+    step,
+    reset,
+    setSpeed
   } = useSchedulerStore();
 
   const hasProcesses = processes.length > 0;
   const isPlaying = playbackState === 'playing';
   const canPlay = hasProcesses && !isSimulationComplete;
-  const isRoundRobin = algorithm === 'rr';
+  const showQuantum = algorithm === 'rr' || algorithm === 'mlq' || algorithm === 'mlfq';
 
   return (
     <div className="card">
@@ -37,13 +37,12 @@ export default function Controls() {
             whileTap={{ scale: 0.95 }}
             onClick={isPlaying ? pause : play}
             disabled={!canPlay}
-            className={`btn w-12 h-12 rounded-xl ${
-              isPlaying 
-                ? 'bg-amber-500 hover:bg-amber-600 text-white' 
-                : canPlay
-                  ? 'btn-primary'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
+            className={`btn w-12 h-12 rounded-xl ${isPlaying
+              ? 'bg-amber-500 hover:bg-amber-600 text-white'
+              : canPlay
+                ? 'btn-primary'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
           >
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </motion.button>
@@ -73,11 +72,10 @@ export default function Controls() {
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  speed === s
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${speed === s
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 {s}x
               </button>
@@ -85,8 +83,8 @@ export default function Controls() {
           </div>
         </div>
 
-        {/* Time quantum for RR */}
-        {isRoundRobin && (
+        {/* Time quantum for RR/MLQ/MLFQ */}
+        {showQuantum && (
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500 uppercase tracking-wide">Quantum</span>
             <div className="flex items-center gap-2">
@@ -97,9 +95,8 @@ export default function Controls() {
                 value={timeQuantum}
                 onChange={(e) => setTimeQuantum(parseInt(e.target.value))}
                 disabled={playbackState !== 'stopped'}
-                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500 ${
-                  playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500 ${playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
               />
               <span className="text-sm font-medium text-gray-700 w-8">{timeQuantum}ms</span>
             </div>

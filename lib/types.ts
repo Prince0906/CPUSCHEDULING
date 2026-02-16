@@ -8,7 +8,9 @@ export type AlgorithmType =
   | 'srtf' 
   | 'priority' 
   | 'priority-preemptive' 
-  | 'rr';
+  | 'rr'
+  | 'mlq'
+  | 'mlfq';
 
 // Algorithm metadata for UI
 export interface AlgorithmInfo {
@@ -91,6 +93,28 @@ export const ALGORITHMS: Record<AlgorithmType, AlgorithmInfo> = {
     cons: ['Higher context switch overhead', 'Performance depends on quantum', 'Higher average waiting time'],
     timeComplexity: 'O(n)',
   },
+  mlq: {
+    id: 'mlq',
+    name: 'Multi-Level Queue',
+    shortName: 'MLQ',
+    description: 'Processes are permanently assigned to one of 3 priority queues. Higher queues are served first using Round Robin; the lowest queue uses FCFS.',
+    isPreemptive: true,
+    selectionCriteria: 'Highest non-empty queue first, RR within queue',
+    pros: ['Low scheduling overhead', 'Good for classified workloads', 'Separates process types'],
+    cons: ['No flexibility between queues', 'Lower queue starvation', 'Rigid classification'],
+    timeComplexity: 'O(n)',
+  },
+  mlfq: {
+    id: 'mlfq',
+    name: 'Multi-Level Feedback Queue',
+    shortName: 'MLFQ',
+    description: 'Processes start in the highest priority queue and are demoted to lower queues if they use their full time quantum. Balances responsiveness with throughput.',
+    isPreemptive: true,
+    selectionCriteria: 'Highest non-empty queue, demote on quantum expiry',
+    pros: ['Adapts to process behavior', 'Good response for short jobs', 'Balances all process types'],
+    cons: ['Complex implementation', 'Possible starvation without aging', 'More context switches'],
+    timeComplexity: 'O(n)',
+  },
 };
 
 // Individual process representation
@@ -109,6 +133,7 @@ export interface Process {
   responseTime: number | null;
   color: string;
   priority: number; // For priority scheduling (1 = highest priority)
+  queueLevel: number; // For MLQ/MLFQ (1 = highest priority queue)
 }
 
 // Entry for Gantt chart visualization
@@ -249,6 +274,7 @@ export interface ProcessInput {
   cpuBurstTime: number;
   ioBurstTime: number;
   priority: number;
+  queueLevel?: number; // For MLQ (1-3), defaults to 1
 }
 
 // Process colors for visualization
@@ -282,4 +308,6 @@ export const ALGORITHM_COLORS: Record<AlgorithmType, string> = {
   priority: '#F97316',
   'priority-preemptive': '#EF4444',
   rr: '#10B981',
+  mlq: '#D946EF',
+  mlfq: '#0EA5E9',
 };
