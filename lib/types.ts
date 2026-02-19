@@ -2,13 +2,38 @@
 export type ProcessState = 'new' | 'ready' | 'running' | 'waiting' | 'terminated';
 
 // Algorithm types supported
-export type AlgorithmType = 
-  | 'fcfs' 
-  | 'sjf' 
-  | 'srtf' 
-  | 'priority' 
-  | 'priority-preemptive' 
-  | 'rr';
+export type AlgorithmType =
+  | 'fcfs'
+  | 'sjf'
+  | 'srtf'
+  | 'priority'
+  | 'priority-preemptive'
+  | 'rr'
+  | 'mlq';
+
+// MLQ process type — determines which queue a process belongs to
+export type ProcessType = 'system' | 'interactive' | 'batch' | 'background';
+
+// Config for a single MLQ queue level
+export interface QueueConfig {
+  id: 0 | 1 | 2 | 3;
+  label: string;                             // e.g. "System"
+  processType: ProcessType;
+  algorithm: Exclude<AlgorithmType, 'mlq'>; // per-queue sub-algorithm
+  timeQuantum: number;                       // only used when algorithm === 'rr'
+  ringColor: string;                         // Tailwind class e.g. 'ring-blue-400'
+  bgTint: string;                            // e.g. 'bg-blue-50'
+  accentHex: string;                         // e.g. '#3B82F6'
+  labelColor: string;                        // e.g. 'text-blue-700'
+}
+
+// Default 4-queue configuration matching user spec
+export const DEFAULT_MLQ_QUEUES: QueueConfig[] = [
+  { id: 0, label: 'System', processType: 'system', algorithm: 'fcfs', timeQuantum: 2, ringColor: 'ring-blue-400', bgTint: 'bg-blue-50', accentHex: '#3B82F6', labelColor: 'text-blue-700' },
+  { id: 1, label: 'Interactive', processType: 'interactive', algorithm: 'rr', timeQuantum: 4, ringColor: 'ring-violet-400', bgTint: 'bg-violet-50', accentHex: '#8B5CF6', labelColor: 'text-violet-700' },
+  { id: 2, label: 'Batch', processType: 'batch', algorithm: 'sjf', timeQuantum: 2, ringColor: 'ring-amber-400', bgTint: 'bg-amber-50', accentHex: '#F59E0B', labelColor: 'text-amber-700' },
+  { id: 3, label: 'Background', processType: 'background', algorithm: 'fcfs', timeQuantum: 2, ringColor: 'ring-gray-300', bgTint: 'bg-gray-50', accentHex: '#6B7280', labelColor: 'text-gray-600' },
+];
 
 // Algorithm metadata for UI
 export interface AlgorithmInfo {
@@ -91,6 +116,17 @@ export const ALGORITHMS: Record<AlgorithmType, AlgorithmInfo> = {
     cons: ['Higher context switch overhead', 'Performance depends on quantum', 'Higher average waiting time'],
     timeComplexity: 'O(n)',
   },
+  mlq: {
+    id: 'mlq',
+    name: 'Multi-Level Queue',
+    shortName: 'MLQ',
+    description: 'Processes are permanently assigned to one of 4 priority queues. Higher queues always preempt lower ones. Q1=System (FCFS), Q2=Interactive (RR), Q3=Batch (SJF), Q4=Background (FCFS).',
+    isPreemptive: true,
+    selectionCriteria: 'Highest non-empty queue wins; within a queue, per-queue algorithm applies',
+    pros: ['Clear priority separation', 'Mirrors real OS design (IRQ-like System queue)', 'Per-queue algorithm tuning'],
+    cons: ['Starvation of lower queues', 'No process migration between queues', 'Static queue assignment'],
+    timeComplexity: 'O(n) per tick',
+  },
 };
 
 // Individual process representation
@@ -108,7 +144,8 @@ export interface Process {
   waitingTime: number;
   responseTime: number | null;
   color: string;
-  priority: number; // For priority scheduling (1 = highest priority)
+  priority: number;          // For priority scheduling (1 = highest priority)
+  queueLevel: 0 | 1 | 2 | 3; // For MLQ — which queue this process belongs to (default: 2 = Batch)
 }
 
 // Entry for Gantt chart visualization
@@ -119,6 +156,27 @@ export interface GanttEntry {
   endTime: number;
   color: string;
   isPreempted?: boolean; // Mark if this segment ended due to preemption
+}
+
+// Extended Gantt entry for MLQ — tracks which queue it came from
+export interface MLQGanttEntry extends GanttEntry {
+  queueId: 0 | 1 | 2 | 3 | null;
+}
+
+// Full MLQ simulation state (parallel to SimulationState)
+export interface MLQSimulationState {
+  processes: Process[];
+  queues: [string[], string[], string[], string[]]; // ready pid lists per queue level
+  ioQueue: string[];                                 // global I/O queue
+  runningProcess: string | null;
+  activeQueueId: 0 | 1 | 2 | 3 | null;             // which queue currently has the CPU
+  completedProcesses: string[];
+  currentTime: number;
+  ganttChart: MLQGanttEntry[];
+  isComplete: boolean;
+  currentQuantum: number;
+  contextSwitchCount: number;                        // how many times the active queue changed
+  starvationMap: Record<string, number>;             // pid → consecutive ticks without CPU
 }
 
 // Simulation playback state
@@ -178,38 +236,45 @@ export interface SchedulerState {
   // Algorithm selection
   algorithm: AlgorithmType;
   timeQuantum: number; // For Round Robin
-  
+
   // Process management
   processes: Process[];
   readyQueue: string[];
   ioQueue: string[];
   runningProcess: string | null;
   completedProcesses: string[];
-  
+
   // Simulation state
   currentTime: number;
   playbackState: PlaybackState;
   speed: SpeedOption;
   isSimulationComplete: boolean;
   currentQuantum: number; // For RR - time spent in current quantum
-  
+
   // Gantt chart data
   ganttChart: GanttEntry[];
-  
+
   // Comparison mode
   isCompareMode: boolean;
   compareAlgorithms: AlgorithmType[];
   compareResults: SimulationResult[];
-  
+
   // Analysis state
   analysisResult: AnalysisResult | null;
   isAnalyzing: boolean;
   analysisError: string | null;
-  
+
   // Recommended algorithm comparison
   recommendedResult: SimulationResult | null;
   isRunningRecommended: boolean;
-  
+
+  // MLQ mode state
+  isMlqMode: boolean;
+  mlqQueues: QueueConfig[];
+  mlqSimState: MLQSimulationState | null;
+  mlqPlaybackState: PlaybackState;
+  mlqSpeed: SpeedOption;
+
   // Actions
   setAlgorithm: (algorithm: AlgorithmType) => void;
   setTimeQuantum: (quantum: number) => void;
@@ -217,29 +282,39 @@ export interface SchedulerState {
   removeProcess: (id: string) => void;
   clearProcesses: () => void;
   loadExample: () => void;
-  
+
   // Simulation controls
   play: () => void;
   pause: () => void;
   step: () => void;
   reset: () => void;
   setSpeed: (speed: SpeedOption) => void;
-  
+
   // Comparison mode
   toggleCompareMode: () => void;
   setCompareAlgorithms: (algorithms: AlgorithmType[]) => void;
   runComparison: () => void;
-  
+
   // Analysis actions
   runAnalysis: () => Promise<void>;
   clearAnalysis: () => void;
-  
+
   // Recommended algorithm actions
   runRecommendedAlgorithm: () => void;
   switchToRecommendedAlgorithm: () => void;
-  
+
+  // MLQ mode actions
+  toggleMlqMode: () => void;
+  updateQueueConfig: (queueId: 0 | 1 | 2 | 3, patch: Partial<QueueConfig>) => void;
+  mlqPlay: () => void;
+  mlqPause: () => void;
+  mlqStep: () => void;
+  mlqReset: () => void;
+  mlqSetSpeed: (speed: SpeedOption) => void;
+
   // Internal simulation methods
   tick: () => void;
+  mlqTick: () => void;
 }
 
 // Process input type (for form)
@@ -249,6 +324,7 @@ export interface ProcessInput {
   cpuBurstTime: number;
   ioBurstTime: number;
   priority: number;
+  queueLevel?: 0 | 1 | 2 | 3; // optional — defaults to 2 (Batch) if not provided
 }
 
 // Process colors for visualization
@@ -282,4 +358,5 @@ export const ALGORITHM_COLORS: Record<AlgorithmType, string> = {
   priority: '#F97316',
   'priority-preemptive': '#EF4444',
   rr: '#10B981',
+  mlq: '#7C3AED',
 };
