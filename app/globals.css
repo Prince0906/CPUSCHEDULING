@@ -99,6 +99,19 @@
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  /* Suppress native OS styling on selects so they match text inputs */
+  select.input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: rgb(249 250 251); /* bg-gray-50 */
+    color: rgb(17 24 39);               /* text-gray-900 */
+    padding-right: 2.5rem;              /* room for custom chevron */
+    cursor: pointer;
+  }
+  select.input:focus {
+    background-color: #fff;
+  }
+
   .input-label {
     @apply block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2;
   }

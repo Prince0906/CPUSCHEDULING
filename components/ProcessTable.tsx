@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useSchedulerStore } from '@/lib/store';
 
 export default function ProcessTable() {
-    const { processes, completedProcesses } = useSchedulerStore();
+    const { processes, completedProcesses, isMlqMode, mlqQueues } = useSchedulerStore();
 
     // Only show processes that have been started (have a startTime)
     const processesToShow = processes.filter(p => p.startTime !== null);
@@ -64,6 +64,11 @@ export default function ProcessTable() {
                                     <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                                         Waiting Time
                                     </th>
+                                    {isMlqMode && (
+                                        <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                            Queue
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -127,6 +132,20 @@ export default function ProcessTable() {
                                                 <span className="text-gray-400">—</span>
                                             )}
                                         </td>
+                                        {isMlqMode && (() => {
+                                            const p = processes.find(pr => pr.name === process.name);
+                                            const q = p ? mlqQueues[p.queueLevel] : undefined;
+                                            return q ? (
+                                                <td className="py-3 px-4 text-right">
+                                                    <span
+                                                        className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                                        style={{ backgroundColor: `${q.accentHex}20`, color: q.accentHex }}
+                                                    >
+                                                        Q{q.id + 1} {q.label}
+                                                    </span>
+                                                </td>
+                                            ) : <td />;
+                                        })()}
                                     </motion.tr>
                                 ))}
                             </tbody>

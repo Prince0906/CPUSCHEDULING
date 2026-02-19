@@ -7,16 +7,19 @@ import { ALGORITHMS, AlgorithmType } from '@/lib/types';
 const algorithms: AlgorithmType[] = ['fcfs', 'sjf', 'srtf', 'priority', 'priority-preemptive', 'rr'];
 
 export default function Header() {
-  const { 
-    currentTime, 
-    algorithm, 
-    setAlgorithm, 
-    isCompareMode, 
+  const {
+    currentTime,
+    algorithm,
+    setAlgorithm,
+    isCompareMode,
     toggleCompareMode,
-    playbackState 
+    playbackState,
+    isMlqMode,
+    toggleMlqMode,
+    mlqPlaybackState,
   } = useSchedulerStore();
-  
-  const isRunning = playbackState !== 'stopped';
+
+  const isRunning = playbackState !== 'stopped' || mlqPlaybackState !== 'stopped';
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
@@ -36,18 +39,17 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-1">
             {algorithms.map((algo) => {
               const info = ALGORITHMS[algo];
-              const isSelected = algorithm === algo && !isCompareMode;
-              
+              const isSelected = algorithm === algo && !isCompareMode && !isMlqMode;
+
               return (
                 <button
                   key={algo}
-                  onClick={() => !isRunning && !isCompareMode && setAlgorithm(algo)}
-                  disabled={isRunning || isCompareMode}
-                  className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                    isSelected
+                  onClick={() => !isRunning && !isCompareMode && !isMlqMode && setAlgorithm(algo)}
+                  disabled={isRunning || isCompareMode || isMlqMode}
+                  className={`px-3 py-2 text-sm font-medium transition-colors relative ${isSelected
                       ? 'text-sky-600'
                       : 'text-gray-500 hover:text-gray-900'
-                  } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${isRunning || isCompareMode || isMlqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {info.shortName}
                   {isSelected && (
@@ -56,17 +58,33 @@ export default function Header() {
                 </button>
               );
             })}
-            
-            <div className="w-px h-6 bg-gray-200 mx-2" />
-            
+
+            <div className="w-px h-6 bg-gray-200 mx-1" />
+
+            {/* MLQ tab — violet accent, toggles isMlqMode */}
             <button
-              onClick={() => !isRunning && toggleCompareMode()}
-              disabled={isRunning}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                isCompareMode
+              onClick={() => !isRunning && toggleMlqMode()}
+              disabled={isRunning || isCompareMode}
+              className={`px-3 py-2 text-sm font-medium transition-colors relative ${isMlqMode
+                  ? 'text-violet-600'
+                  : 'text-gray-500 hover:text-gray-900'
+                } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              MLQ
+              {isMlqMode && (
+                <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-violet-500 rounded-full" />
+              )}
+            </button>
+
+            <div className="w-px h-6 bg-gray-200 mx-1" />
+
+            <button
+              onClick={() => !isRunning && !isMlqMode && toggleCompareMode()}
+              disabled={isRunning || isMlqMode}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${isCompareMode
                   ? 'text-sky-600'
                   : 'text-gray-500 hover:text-gray-900'
-              } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isRunning || isMlqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Compare
             </button>

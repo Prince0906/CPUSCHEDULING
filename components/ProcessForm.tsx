@@ -6,34 +6,36 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useSchedulerStore } from '@/lib/store';
 
 export default function ProcessForm() {
-  const { processes, algorithm, addProcess, removeProcess, clearProcesses, loadExample, playbackState, isCompareMode } = useSchedulerStore();
+  const { processes, algorithm, addProcess, removeProcess, clearProcesses, loadExample, playbackState, isCompareMode, isMlqMode, mlqQueues } = useSchedulerStore();
   const isRunning = playbackState !== 'stopped';
-  const showPriority = algorithm === 'priority' || algorithm === 'priority-preemptive' || isCompareMode;
-  
+  const showPriority = !isMlqMode && (algorithm === 'priority' || algorithm === 'priority-preemptive' || isCompareMode);
+  const showQueue = isMlqMode;
+
   const [formData, setFormData] = useState({
     name: 'P1',
     arrivalTime: 0,
     cpuBurstTime: 4,
     ioBurstTime: 0,
     priority: 1,
+    queueLevel: 2 as 0 | 1 | 2 | 3,
   });
-  
+
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
+
     if (!formData.name.trim()) {
       setError('Process name is required');
       return;
     }
-    
+
     if (formData.cpuBurstTime < 1) {
       setError('CPU burst must be at least 1');
       return;
     }
-    
+
     if (processes.some(p => p.name === formData.name.trim())) {
       setError(`Process "${formData.name.trim()}" already exists`);
       return;
@@ -45,6 +47,7 @@ export default function ProcessForm() {
       cpuBurstTime: formData.cpuBurstTime,
       ioBurstTime: formData.ioBurstTime,
       priority: formData.priority,
+      queueLevel: formData.queueLevel,
     });
 
     const nextNumber = processes.length + 2;
@@ -54,6 +57,7 @@ export default function ProcessForm() {
       cpuBurstTime: 4,
       ioBurstTime: 0,
       priority: nextNumber,
+      queueLevel: (formData.queueLevel ?? 2) as 0 | 1 | 2 | 3, // preserve last selected queue
     });
   };
 
@@ -135,13 +139,41 @@ export default function ProcessForm() {
               value={formData.priority}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
-                // Clamp priority between 1 and 10
                 const clamped = isNaN(value) ? 1 : Math.max(1, Math.min(10, value));
                 setFormData({ ...formData, priority: clamped });
               }}
               disabled={isRunning}
               className="input"
             />
+          </div>
+        )}
+
+        {/* Queue selector — MLQ mode only */}
+        {showQueue && (
+          <div>
+            <label className="input-label">Queue</label>
+            <div className="relative">
+              <select
+                value={formData.queueLevel}
+                onChange={(e) =>
+                  setFormData({ ...formData, queueLevel: Number(e.target.value) as 0 | 1 | 2 | 3 })
+                }
+                disabled={isRunning}
+                className="input pr-10"
+              >
+                {mlqQueues.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    Q{q.id + 1} · {q.label} ({q.algorithm.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+              {/* Custom chevron */}
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
         )}
 
@@ -182,10 +214,11 @@ export default function ProcessForm() {
             <div className="w-16 text-center">Burst</div>
             <div className="w-12 text-center">I/O</div>
             {showPriority && <div className="w-14 text-center">Priority</div>}
+            {showQueue && <div className="w-14 text-center">Queue</div>}
             <div className="flex-1 text-right">Status</div>
           </div>
         )}
-        
+
         <div className="max-h-[280px] overflow-y-auto">
           <AnimatePresence mode="popLayout">
             {processes.length === 0 ? (
@@ -204,46 +237,59 @@ export default function ProcessForm() {
                   >
                     {/* Process Name with Color */}
                     <div className="w-16 flex items-center gap-2">
-                      <div 
+                      <div
                         className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{ backgroundColor: process.color }}
                       />
                       <span className="font-medium text-gray-900 text-sm">{process.name}</span>
                     </div>
-                    
+
                     {/* Arrival Time */}
                     <div className="w-16 text-center">
                       <span className="text-xs text-gray-600 tabular-nums">{process.arrivalTime}ms</span>
                     </div>
-                    
+
                     {/* Burst Time */}
                     <div className="w-16 text-center">
                       <span className="text-xs text-gray-600 tabular-nums">{process.cpuBurstTime}ms</span>
                     </div>
-                    
+
                     {/* I/O Time */}
                     <div className="w-12 text-center">
                       <span className="text-xs text-gray-500 tabular-nums">
                         {process.ioBurstTime > 0 ? `${process.ioBurstTime}ms` : '—'}
                       </span>
                     </div>
-                    
+
                     {/* Priority */}
                     {showPriority && (
                       <div className="w-14 text-center">
                         <span className="text-xs text-gray-600 tabular-nums">{process.priority}</span>
                       </div>
                     )}
-                    
+                    {/* Queue (MLQ mode) */}
+                    {showQueue && (
+                      <div className="w-14 text-center">
+                        <span
+                          className="text-xs font-medium tabular-nums px-1.5 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: `${mlqQueues[process.queueLevel]?.accentHex ?? '#94A3B8'}20`,
+                            color: mlqQueues[process.queueLevel]?.accentHex ?? '#94A3B8',
+                          }}
+                        >
+                          Q{process.queueLevel + 1}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Status and Actions */}
                     <div className="flex-1 flex items-center justify-end gap-2">
-                      <span className={`badge text-[10px] ${
-                        process.state === 'ready' ? 'state-ready' :
+                      <span className={`badge text-[10px] ${process.state === 'ready' ? 'state-ready' :
                         process.state === 'running' ? 'state-running' :
-                        process.state === 'waiting' ? 'state-waiting' :
-                        process.state === 'terminated' ? 'state-completed' :
-                        'state-new'
-                      }`}>
+                          process.state === 'waiting' ? 'state-waiting' :
+                            process.state === 'terminated' ? 'state-completed' :
+                              'state-new'
+                        }`}>
                         {process.state === 'terminated' ? 'done' : process.state}
                       </span>
                       {!isRunning && (
@@ -261,7 +307,7 @@ export default function ProcessForm() {
             )}
           </AnimatePresence>
         </div>
-        
+
         {processes.length > 0 && !isRunning && (
           <div className="px-6 py-3 border-t border-gray-100">
             <button
