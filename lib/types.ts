@@ -264,9 +264,7 @@ export interface SchedulerState {
   isAnalyzing: boolean;
   analysisError: string | null;
 
-  // Recommended algorithm comparison
-  recommendedResult: SimulationResult | null;
-  isRunningRecommended: boolean;
+  // Recommended algorithm comparison (removed — see compareWithAlternatives)
 
   // MLQ mode state
   isMlqMode: boolean;
@@ -294,14 +292,10 @@ export interface SchedulerState {
   toggleCompareMode: () => void;
   setCompareAlgorithms: (algorithms: AlgorithmType[]) => void;
   runComparison: () => void;
+  compareWithAlternatives: (alternatives: AlgorithmType[]) => void;
 
-  // Analysis actions
   runAnalysis: () => Promise<void>;
   clearAnalysis: () => void;
-
-  // Recommended algorithm actions
-  runRecommendedAlgorithm: () => void;
-  switchToRecommendedAlgorithm: () => void;
 
   // MLQ mode actions
   toggleMlqMode: () => void;

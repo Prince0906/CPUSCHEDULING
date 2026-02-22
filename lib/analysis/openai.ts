@@ -71,10 +71,10 @@ export async function analyzeSimulation(
   data: SimulationDataForAnalysis
 ): Promise<AnalysisResult> {
   const prompt = buildAnalysisPrompt(data);
-  
+
   // Track if we should try user key as fallback
   let shouldTryUserKey = false;
-  
+
   // First, try using the server-side API route (uses env variable)
   try {
     const serverResponse = await fetch('/api/analyze', {
@@ -126,13 +126,13 @@ export async function analyzeSimulation(
       // This is a real server error - propagate it
       throw error;
     }
-    
+
     // Network error or fetch failure - try user key as fallback
     // Don't modify envKeyAvailable since we couldn't reach the server
     console.log('Server API unavailable, trying user key...', error);
     shouldTryUserKey = true;
   }
-  
+
   // If we shouldn't try user key, something went wrong in the logic above
   if (!shouldTryUserKey) {
     throw new Error('Analysis failed. Please try again.');
@@ -140,7 +140,7 @@ export async function analyzeSimulation(
 
   // Fall back to user's API key
   const userApiKey = getUserApiKey();
-  
+
   if (!userApiKey) {
     throw new Error('Please configure your OpenAI API key to use AI analysis.');
   }
@@ -166,7 +166,7 @@ export async function analyzeSimulation(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      
+
       if (response.status === 401) {
         throw new Error('Invalid API key. Please check your OpenAI API key.');
       } else if (response.status === 429) {
@@ -174,7 +174,7 @@ export async function analyzeSimulation(
       } else if (response.status === 500) {
         throw new Error('OpenAI service error. Please try again later.');
       }
-      
+
       throw new Error(errorData.error?.message || `API error: ${response.status}`);
     }
 
@@ -186,7 +186,7 @@ export async function analyzeSimulation(
     }
 
     const parsed = parseAnalysisResponse(content);
-    
+
     return {
       ...parsed,
       algorithm: data.algorithm,
@@ -217,11 +217,11 @@ function parseAnalysisResponse(
     const flaws: FlawDetection[] = (parsed.flaws || []).map((flaw: Record<string, unknown>) => ({
       type: validateFlawType(flaw.type as string),
       severity: validateSeverity(flaw.severity as string),
-      affectedProcesses: Array.isArray(flaw.affectedProcesses) 
+      affectedProcesses: Array.isArray(flaw.affectedProcesses)
         ? flaw.affectedProcesses
-            .filter(p => p != null) // Filter out null and undefined before converting
-            .map(String)
-            .filter(s => s && s !== 'undefined' && s !== 'null' && s.trim() !== '') 
+          .filter(p => p != null) // Filter out null and undefined before converting
+          .map(String)
+          .filter(s => s && s !== 'undefined' && s !== 'null' && s.trim() !== '')
         : [],
       description: String(flaw.description || ''),
       explanation: String(flaw.explanation || ''),
@@ -229,24 +229,17 @@ function parseAnalysisResponse(
       betterAlgorithms: validateAlgorithms(flaw.betterAlgorithms as string[]),
     }));
 
-    // Validate best alternative
-    let bestAlternative = undefined;
-    if (parsed.bestAlternative && parsed.bestAlternative.algorithm) {
-      const algo = validateAlgorithm(parsed.bestAlternative.algorithm);
-      if (algo) {
-        bestAlternative = {
-          algorithm: algo,
-          reason: String(parsed.bestAlternative.reason || ''),
-        };
-      }
-    }
+    // Validate suggested alternatives
+    const suggestedAlternatives = validateAlgorithms(
+      Array.isArray(parsed.suggestedAlternatives) ? parsed.suggestedAlternatives : []
+    );
 
     return {
       flaws,
       overallAssessment: String(parsed.overallAssessment || 'Analysis complete.'),
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths.map(String) : [],
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],
-      bestAlternative,
+      suggestedAlternatives,
     };
   } catch (error) {
     console.error('Failed to parse analysis response:', error);
@@ -256,7 +249,7 @@ function parseAnalysisResponse(
       overallAssessment: 'Unable to fully parse the analysis. The simulation completed successfully.',
       strengths: [],
       recommendations: ['Consider running the analysis again for detailed insights.'],
-      bestAlternative: undefined,
+      suggestedAlternatives: [],
     };
   }
 }
@@ -280,6 +273,7 @@ const VALID_ALGORITHMS: AlgorithmType[] = [
   'priority',
   'priority-preemptive',
   'rr',
+  'mlq',
 ];
 
 function validateFlawType(type: string): FlawType {
@@ -319,6 +313,7 @@ export function prepareSimulationData(
     cpuBurstTime: number;
     ioBurstTime: number;
     priority: number;
+    queueLevel?: 0 | 1 | 2 | 3;
     completionTime: number | null;
     waitingTime: number;
     responseTime: number | null;

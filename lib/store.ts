@@ -54,9 +54,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   isAnalyzing: false,
   analysisError: null,
 
-  // Recommended algorithm comparison
-  recommendedResult: null,
-  isRunningRecommended: false,
+  // (recommended flow removed — compare mode is now used instead)
 
   // ── MLQ mode state ────────────────────────────────────────────────────────
   isMlqMode: false,
@@ -89,7 +87,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       // Clear analysis when processes change
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
@@ -101,7 +98,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       // Clear analysis when processes change
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
@@ -131,7 +127,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       // Clear analysis
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
@@ -165,7 +160,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       // Clear analysis when loading example
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
@@ -235,10 +229,9 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       isSimulationComplete: false,
       ganttChart: [],
       currentQuantum: 0,
-      // Clear analysis on reset (keep mlqSimState reset separate)
+      // Clear analysis on reset
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
     // Also reset MLQ state if in MLQ mode
     if (state.isMlqMode) {
@@ -342,6 +335,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
           cpuBurstTime: p.cpuBurstTime,
           ioBurstTime: p.ioBurstTime,
           priority: p.priority,
+          queueLevel: p.queueLevel,
           completionTime: p.completionTime,
           waitingTime: p.waitingTime,
           responseTime: p.responseTime,
@@ -353,14 +347,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
 
       const result = await analyzeSimulation(simulationData);
       set({ analysisResult: result, isAnalyzing: false });
-
-      // Auto-run recommended algorithm for comparison if available
-      if (result.bestAlternative && result.bestAlternative.algorithm !== state.algorithm) {
-        // Small delay to let UI update first
-        setTimeout(() => {
-          get().runRecommendedAlgorithm();
-        }, 50);
-      }
     } catch (error) {
       set({
         analysisError: error instanceof Error ? error.message : 'Analysis failed. Please try again.',
@@ -371,70 +357,25 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
 
   // Clear analysis results
   clearAnalysis: () => {
-    set({ analysisResult: null, analysisError: null, recommendedResult: null });
+    set({ analysisResult: null, analysisError: null });
   },
 
-  // Run recommended algorithm simulation for comparison
-  runRecommendedAlgorithm: () => {
+  // Compare current algorithm against AI-suggested alternatives in Compare Mode
+  compareWithAlternatives: (alternatives: AlgorithmType[]) => {
     const state = get();
-
-    // Need analysis result with a best alternative
-    if (!state.analysisResult?.bestAlternative) {
-      return;
-    }
-
-    const recommendedAlgo = state.analysisResult.bestAlternative.algorithm;
-
-    // Don't run if same as current algorithm
-    if (recommendedAlgo === state.algorithm) {
-      return;
-    }
-
-    set({ isRunningRecommended: true });
-
-    // Clone processes and run full simulation with recommended algorithm
-    const clonedProcesses = cloneProcessesForSimulation(state.processes);
-    const finalState = runFullSimulation(clonedProcesses, recommendedAlgo, state.timeQuantum);
-
-    const stats = calculateStatistics(
-      finalState.processes,
-      finalState.currentTime,
-      finalState.ganttChart
-    );
-
-    const result: SimulationResult = {
-      algorithm: recommendedAlgo,
-      ganttChart: finalState.ganttChart,
-      statistics: stats,
-      processStats: getProcessStats(finalState.processes),
-      totalTime: finalState.currentTime,
-    };
-
-    set({ recommendedResult: result, isRunningRecommended: false });
-  },
-
-  // Switch to the recommended algorithm and reset simulation
-  switchToRecommendedAlgorithm: () => {
-    const state = get();
-
-    if (!state.analysisResult?.bestAlternative) {
-      return;
-    }
-
-    const recommendedAlgo = state.analysisResult.bestAlternative.algorithm;
-
-    // Clear analysis and recommended results
+    const currentAlgo = state.algorithm;
+    const deduped = [currentAlgo, ...Array.from(new Set(alternatives.filter(a => a !== currentAlgo)))] as AlgorithmType[];
     set({
-      analysisResult: null,
-      analysisError: null,
-      recommendedResult: null,
+      isCompareMode: true,
+      compareAlgorithms: deduped,
     });
-
-    // Set the new algorithm and reset
-    get().setAlgorithm(recommendedAlgo);
+    // Run immediately so user lands on results, not an empty page
+    get().runComparison();
   },
 
   // ── MLQ Mode Actions ──────────────────────────────────────────────────────
+
+
 
   // Enter/exit MLQ mode
   toggleMlqMode: () => {
@@ -475,7 +416,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       })),
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
