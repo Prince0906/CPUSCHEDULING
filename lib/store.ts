@@ -638,7 +638,6 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       })),
       analysisResult: null,
       analysisError: null,
-      recommendedResult: null,
     });
   },
 
