@@ -1,7 +1,7 @@
 import { AlgorithmType } from '../types';
 
 // Types of flaws that can be detected in scheduling algorithms
-export type FlawType = 
+export type FlawType =
   | 'convoy'           // Long process blocks shorter ones (FCFS)
   | 'starvation'       // Process waits indefinitely (SJF/Priority)
   | 'context_switches' // Too many preemptions (RR)
@@ -31,10 +31,7 @@ export interface AnalysisResult {
   overallAssessment: string;
   strengths: string[]; // What the algorithm did well
   recommendations: string[];
-  bestAlternative?: {
-    algorithm: AlgorithmType;
-    reason: string;
-  };
+  suggestedAlternatives: AlgorithmType[];
 }
 
 // Analysis state in the store
@@ -56,6 +53,7 @@ export interface SimulationDataForAnalysis {
     cpuBurstTime: number;
     ioBurstTime: number;
     priority: number;
+    queueLevel?: 0 | 1 | 2 | 3;
     completionTime: number | null;
     waitingTime: number;
     turnaroundTime: number;

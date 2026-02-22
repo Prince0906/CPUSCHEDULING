@@ -2,19 +2,52 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, AlertCircle, CheckCircle2, Key, ChevronDown, ArrowRight, Sparkles } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, Key, ChevronDown, GitCompare, Sparkles, TriangleAlert, Lightbulb } from 'lucide-react';
 import { useSchedulerStore } from '@/lib/store';
 import { ALGORITHMS } from '@/lib/types';
 import { FlawDetection, FLAW_TYPE_INFO } from '@/lib/analysis/types';
 import { hasUserApiKey, getEnvKeyStatus } from '@/lib/analysis/openai';
 import ApiKeyModal from './ApiKeyModal';
 
-// Compact issue row with expand
+// ─── Skeleton Loader ──────────────────────────────────────────────────────────
+function SkeletonLine({ className }: { className?: string }) {
+  return (
+    <div className={`h-3 bg-gray-200 rounded-full animate-pulse ${className}`} />
+  );
+}
+
+function AnalysisSkeleton() {
+  return (
+    <div className="space-y-5">
+      {/* Executive Summary skeleton */}
+      <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 space-y-2">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-4 h-4 bg-indigo-200 rounded animate-pulse" />
+          <SkeletonLine className="w-36 bg-indigo-200" />
+        </div>
+        <SkeletonLine className="w-full" />
+        <SkeletonLine className="w-4/5" />
+        <SkeletonLine className="w-3/5" />
+      </div>
+      {/* Hero block skeleton */}
+      <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+        <SkeletonLine className="w-40" />
+        <div className="flex gap-2">
+          <div className="h-7 w-14 bg-gray-200 rounded-full animate-pulse" />
+          <div className="h-7 w-10 bg-gray-200 rounded-full animate-pulse" />
+        </div>
+        <div className="h-10 bg-gray-200 rounded-lg animate-pulse w-full" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Refined Issue Row ────────────────────────────────────────────────────────
 function IssueRow({ flaw, index }: { flaw: FlawDetection; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const flawInfo = FLAW_TYPE_INFO[flaw.type];
-  
-  const severityColor = {
+
+  const severityDot = {
     high: 'bg-red-500',
     medium: 'bg-orange-500',
     low: 'bg-amber-400',
@@ -30,7 +63,7 @@ function IssueRow({ flaw, index }: { flaw: FlawDetection; index: number }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full py-2.5 flex items-start gap-3 text-left hover:bg-gray-50 transition-colors rounded-lg px-2 -mx-2"
       >
-        <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${severityColor}`} />
+        <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${severityDot}`} />
         <div className="flex-1 min-w-0">
           <span className="text-sm font-medium text-gray-900">{flawInfo.label}</span>
           {flaw.affectedProcesses.length > 0 && (
@@ -39,11 +72,11 @@ function IssueRow({ flaw, index }: { flaw: FlawDetection; index: number }) {
             </span>
           )}
         </div>
-        <ChevronDown 
-          className={`w-4 h-4 text-gray-300 flex-shrink-0 transition-transform mt-0.5 ${expanded ? 'rotate-180' : ''}`} 
+        <ChevronDown
+          className={`w-4 h-4 text-gray-300 flex-shrink-0 transition-transform mt-0.5 ${expanded ? 'rotate-180' : ''}`}
         />
       </button>
-      
+
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -52,10 +85,21 @@ function IssueRow({ flaw, index }: { flaw: FlawDetection; index: number }) {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="pl-5 pb-3 pr-2">
-              <p className="text-sm text-gray-500 leading-relaxed">{flaw.description}</p>
+            <div className="pl-5 pb-3 pr-2 space-y-2">
+              {/* Problem description */}
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-500 leading-relaxed">{flaw.description}</p>
+              </div>
+              {/* AI Recommendation — visually distinct */}
               {flaw.recommendation && (
-                <p className="text-sm text-sky-600 mt-2">{flaw.recommendation}</p>
+                <div className="border-l-4 border-blue-400 bg-blue-50 rounded-r-lg px-3 py-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Lightbulb className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Recommendation</span>
+                  </div>
+                  <p className="text-sm text-blue-800 leading-relaxed">{flaw.recommendation}</p>
+                </div>
               )}
             </div>
           </motion.div>
@@ -65,63 +109,7 @@ function IssueRow({ flaw, index }: { flaw: FlawDetection; index: number }) {
   );
 }
 
-// Comparison bar component
-function ComparisonBar({ 
-  label, 
-  currentValue, 
-  recommendedValue, 
-  unit,
-  isLowerBetter = true 
-}: { 
-  label: string; 
-  currentValue: number; 
-  recommendedValue: number; 
-  unit: string;
-  isLowerBetter?: boolean;
-}) {
-  const maxValue = Math.max(currentValue, recommendedValue);
-  const currentWidth = maxValue > 0 ? (currentValue / maxValue) * 100 : 0;
-  const recommendedWidth = maxValue > 0 ? (recommendedValue / maxValue) * 100 : 0;
-  
-  const isImproved = isLowerBetter 
-    ? recommendedValue < currentValue 
-    : recommendedValue > currentValue;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-xs text-gray-500">
-        <span>{label}</span>
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-3">
-          <div className="w-14 text-xs text-gray-400">Current</div>
-          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gray-400 rounded-full transition-all duration-500"
-              style={{ width: `${currentWidth}%` }}
-            />
-          </div>
-          <div className="w-16 text-right text-xs text-gray-600 tabular-nums">
-            {currentValue.toFixed(1)}{unit}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-14 text-xs text-gray-400">Better</div>
-          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${isImproved ? 'bg-emerald-500' : 'bg-gray-400'}`}
-              style={{ width: `${recommendedWidth}%` }}
-            />
-          </div>
-          <div className={`w-16 text-right text-xs tabular-nums ${isImproved ? 'text-emerald-600 font-medium' : 'text-gray-600'}`}>
-            {recommendedValue.toFixed(1)}{unit}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function FlawAnalysis() {
   const {
     isSimulationComplete,
@@ -131,9 +119,7 @@ export default function FlawAnalysis() {
     runAnalysis,
     algorithm,
     processes,
-    recommendedResult,
-    isRunningRecommended,
-    switchToRecommendedAlgorithm,
+    compareWithAlternatives,
   } = useSchedulerStore();
 
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -146,7 +132,7 @@ export default function FlawAnalysis() {
     setUserKeyConfigured(hasUserApiKey());
     setEnvKeyStatus(getEnvKeyStatus());
   }, [showApiKeyModal]);
-  
+
   useEffect(() => {
     if (analysisResult || analysisError) {
       setEnvKeyStatus(getEnvKeyStatus());
@@ -154,33 +140,15 @@ export default function FlawAnalysis() {
     }
   }, [analysisResult, analysisError]);
 
-  if (!isSimulationComplete || processes.length === 0) {
-    return null;
-  }
-
-  if (!mounted) {
-    return null;
-  }
+  if (!isSimulationComplete || processes.length === 0) return null;
+  if (!mounted) return null;
 
   const algorithmName = ALGORITHMS[algorithm]?.shortName || algorithm;
   const flaws = analysisResult?.flaws || [];
-  const hasRecommendation = analysisResult?.bestAlternative && analysisResult.bestAlternative.algorithm !== algorithm;
-  
-  // Calculate current stats for comparison
-  const currentStats = {
-    avgWaitingTime: processes.reduce((sum, p) => sum + p.waitingTime, 0) / processes.length,
-    avgTurnaroundTime: processes.reduce((sum, p) => sum + (p.completionTime ? p.completionTime - p.arrivalTime : 0), 0) / processes.length,
-    avgResponseTime: processes.reduce((sum, p) => sum + (p.responseTime ?? 0), 0) / processes.length,
-  };
+  const suggestedAlternatives = analysisResult?.suggestedAlternatives || [];
+  const hasAlternatives = suggestedAlternatives.length > 0;
 
-  // Calculate improvement percentage
-  let improvementPercent = 0;
-  let improvementMetric = 'wait time';
-  if (recommendedResult && currentStats.avgWaitingTime > 0) {
-    improvementPercent = ((currentStats.avgWaitingTime - recommendedResult.statistics.avgWaitingTime) / currentStats.avgWaitingTime) * 100;
-  }
-
-  // Severity counts for the dots display
+  // Severity counts for dots
   const severityCounts = flaws.reduce((acc, f) => {
     acc[f.severity] = (acc[f.severity] || 0) + 1;
     return acc;
@@ -195,7 +163,7 @@ export default function FlawAnalysis() {
       >
         <div className="section-header flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="section-title">AI Analysis</h2>
+            <h2 className="section-title">Flaw Analysis</h2>
           </div>
           {(envKeyStatus !== true || userKeyConfigured) && (
             <button
@@ -208,7 +176,7 @@ export default function FlawAnalysis() {
         </div>
 
         <div className="p-6">
-          {/* API Key Required */}
+          {/* ─── API Key Required ─────────────────────────────────────── */}
           {!userKeyConfigured && envKeyStatus === false && !isAnalyzing && !analysisResult && !analysisError && (
             <div className="text-center py-8">
               <Key className="w-10 h-10 text-gray-200 mx-auto mb-4" />
@@ -222,22 +190,14 @@ export default function FlawAnalysis() {
             </div>
           )}
 
-          {/* Loading States */}
+          {/* ─── Loading / Analyzing ──────────────────────────────────── */}
           {((envKeyStatus !== false || userKeyConfigured) && !isAnalyzing && !analysisResult && !analysisError) && (
-            <div className="flex items-center justify-center gap-3 py-10">
-              <RefreshCw className="w-5 h-5 text-sky-500 animate-spin" />
-              <span className="text-gray-600">Analyzing...</span>
-            </div>
+            <AnalysisSkeleton />
           )}
 
-          {isAnalyzing && (
-            <div className="flex items-center justify-center gap-3 py-10">
-              <RefreshCw className="w-5 h-5 text-sky-500 animate-spin" />
-              <span className="text-gray-600">Analyzing with AI...</span>
-            </div>
-          )}
+          {isAnalyzing && <AnalysisSkeleton />}
 
-          {/* Error */}
+          {/* ─── Error ───────────────────────────────────────────────── */}
           {analysisError && (
             <div className="text-center py-8">
               <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-4" />
@@ -253,87 +213,71 @@ export default function FlawAnalysis() {
             </div>
           )}
 
-          {/* Results */}
+          {/* ─── Results ─────────────────────────────────────────────── */}
           {analysisResult && (
-            <div className="space-y-6">
-              
-              {/* Hero Insight - Recommendation with Visual Comparison */}
-              {hasRecommendation && (
-                <div className="bg-gradient-to-br from-sky-50 to-emerald-50 rounded-xl p-5 border border-sky-100">
-                  {/* Headline */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {improvementPercent > 0 ? (
-                        <>
-                          <span className="text-emerald-600">{ALGORITHMS[analysisResult.bestAlternative!.algorithm]?.shortName}</span>
-                          {' '}would reduce {improvementMetric} by{' '}
-                          <span className="text-emerald-600">{improvementPercent.toFixed(0)}%</span>
-                        </>
-                      ) : (
-                        <>
-                          Try <span className="text-sky-600">{ALGORITHMS[analysisResult.bestAlternative!.algorithm]?.shortName}</span> for this workload
-                        </>
-                      )}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {analysisResult.bestAlternative!.reason}
-                    </p>
-                  </div>
+            <div className="space-y-5">
 
-                  {/* Visual Comparison Bars */}
-                  {recommendedResult ? (
-                    <div className="space-y-4 mb-5">
-                      <ComparisonBar
-                        label="Average Wait Time"
-                        currentValue={currentStats.avgWaitingTime}
-                        recommendedValue={recommendedResult.statistics.avgWaitingTime}
-                        unit="ms"
-                        isLowerBetter={true}
-                      />
-                      <ComparisonBar
-                        label="Average Turnaround"
-                        currentValue={currentStats.avgTurnaroundTime}
-                        recommendedValue={recommendedResult.statistics.avgTurnaroundTime}
-                        unit="ms"
-                        isLowerBetter={true}
-                      />
-                    </div>
-                  ) : isRunningRecommended ? (
-                    <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Calculating comparison...
-                    </div>
-                  ) : null}
-
-                  {/* Action Button */}
-                  <button
-                    onClick={switchToRecommendedAlgorithm}
-                    className="btn btn-primary w-full py-3 text-sm font-medium gap-2"
-                  >
-                    Switch to {ALGORITHMS[analysisResult.bestAlternative!.algorithm]?.shortName}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+              {/* 1. Executive Summary ────────────────────────────────── */}
+              <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">AI Overall Assessment</span>
                 </div>
+                <p className="text-sm text-indigo-900 leading-relaxed">{analysisResult.overallAssessment}</p>
+              </div>
+
+              {/* 2. Optimization Opportunities Hero Block ─────────────── */}
+              {hasAlternatives && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-gradient-to-br from-sky-50 to-indigo-50 rounded-xl p-4 border border-sky-100"
+                >
+                  <p className="text-sm font-medium text-gray-700 mb-3">
+                    Optimization Opportunities
+                  </p>
+                  {/* Algorithm chips */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {suggestedAlternatives.map((algo) => (
+                      <span
+                        key={algo}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white border border-sky-200 text-sky-700 shadow-sm"
+                      >
+                        {ALGORITHMS[algo]?.shortName || algo}
+                      </span>
+                    ))}
+                  </div>
+                  {/* CTA Button */}
+                  <button
+                    onClick={() => compareWithAlternatives(suggestedAlternatives)}
+                    className="btn btn-primary w-full py-2.5 text-sm font-medium gap-2"
+                  >
+                    <GitCompare className="w-4 h-4" />
+                    Compare with Alternatives
+                  </button>
+                </motion.div>
               )}
 
-              {/* No Issues - Good Performance */}
-              {flaws.length === 0 && !hasRecommendation && (
+              {/* 3. Optimal State (no flaws, no alternatives) ─────────── */}
+              {flaws.length === 0 && !hasAlternatives && (
                 <div className="flex items-center gap-3 py-4 px-4 bg-emerald-50 rounded-xl border border-emerald-100">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-emerald-800">{algorithmName} is optimal for this workload</p>
-                    <p className="text-sm text-emerald-600 mt-0.5">{analysisResult.overallAssessment}</p>
+                    <p className="font-medium text-emerald-800">Optimal Performance</p>
+                    <p className="text-sm text-emerald-600 mt-0.5">No major flaws detected for this specific workload.</p>
                   </div>
                 </div>
               )}
 
-              {/* Issues Section */}
+              {/* 4. Issue List ───────────────────────────────────────── */}
               {flaws.length > 0 && (
                 <div>
-                  {/* Issues Header with Severity Dots */}
+                  {/* Issues header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-700">{flaws.length} Issue{flaws.length !== 1 ? 's' : ''}</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        {flaws.length} Issue{flaws.length !== 1 ? 's' : ''}
+                      </span>
                       <div className="flex items-center gap-1.5">
                         {severityCounts.high > 0 && (
                           <div className="flex items-center gap-1">
@@ -367,19 +311,12 @@ export default function FlawAnalysis() {
                     </button>
                   </div>
 
-                  {/* Issues List */}
+                  {/* Issue rows */}
                   <div className="space-y-1">
                     {flaws.map((flaw, index) => (
                       <IssueRow key={`${flaw.type}-${index}`} flaw={flaw} index={index} />
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Recommendation without comparison (if no better algorithm) */}
-              {!hasRecommendation && flaws.length > 0 && (
-                <div className="pt-4 border-t border-gray-100">
-                  <p className="text-sm text-gray-500">{analysisResult.overallAssessment}</p>
                 </div>
               )}
             </div>
