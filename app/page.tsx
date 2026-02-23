@@ -16,6 +16,7 @@ import CompareMode from '@/components/CompareMode';
 import FlawAnalysis from '@/components/FlawAnalysis';
 import MLQDashboard from '@/components/MLQDashboard';
 import MLQConfig from '@/components/MLQConfig';
+import AgingPanel from '@/components/AgingPanel';
 import { Play, Pause, SkipForward, RotateCcw } from 'lucide-react';
 import { SpeedOption } from '@/lib/types';
 
@@ -25,6 +26,7 @@ export default function Home() {
   const {
     isCompareMode,
     isMlqMode,
+    algorithm,
     mlqPlaybackState,
     mlqPlay,
     mlqPause,
@@ -133,6 +135,9 @@ export default function Home() {
 
                 {/* Completed processes */}
                 <CompletedProcesses />
+
+                {/* Aging Monitor — only shown for priority-aging */}
+                {algorithm === 'priority-aging' && <AgingPanel />}
 
                 {/* Controls */}
                 <Controls />

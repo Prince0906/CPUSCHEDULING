@@ -8,25 +8,28 @@ import { SpeedOption } from '@/lib/types';
 const speeds: SpeedOption[] = [0.5, 1, 2, 4];
 
 export default function Controls() {
-  const { 
-    playbackState, 
-    speed, 
+  const {
+    playbackState,
+    speed,
     isSimulationComplete,
     processes,
     algorithm,
     timeQuantum,
     setTimeQuantum,
-    play, 
-    pause, 
-    step, 
-    reset, 
-    setSpeed 
+    agingTime,
+    setAgingTime,
+    play,
+    pause,
+    step,
+    reset,
+    setSpeed
   } = useSchedulerStore();
 
   const hasProcesses = processes.length > 0;
   const isPlaying = playbackState === 'playing';
   const canPlay = hasProcesses && !isSimulationComplete;
   const isRoundRobin = algorithm === 'rr';
+  const isPriorityAging = algorithm === 'priority-aging';
 
   return (
     <div className="card">
@@ -37,13 +40,12 @@ export default function Controls() {
             whileTap={{ scale: 0.95 }}
             onClick={isPlaying ? pause : play}
             disabled={!canPlay}
-            className={`btn w-12 h-12 rounded-xl ${
-              isPlaying 
-                ? 'bg-amber-500 hover:bg-amber-600 text-white' 
-                : canPlay
-                  ? 'btn-primary'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
+            className={`btn w-12 h-12 rounded-xl ${isPlaying
+              ? 'bg-amber-500 hover:bg-amber-600 text-white'
+              : canPlay
+                ? 'btn-primary'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
           >
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </motion.button>
@@ -73,11 +75,10 @@ export default function Controls() {
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  speed === s
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${speed === s
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 {s}x
               </button>
@@ -97,11 +98,43 @@ export default function Controls() {
                 value={timeQuantum}
                 onChange={(e) => setTimeQuantum(parseInt(e.target.value))}
                 disabled={playbackState !== 'stopped'}
-                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500 ${
-                  playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500 ${playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
               />
               <span className="text-sm font-medium text-gray-700 w-8">{timeQuantum}ms</span>
+            </div>
+          </div>
+        )}
+
+        {/* Aging time for Priority Aging */}
+        {isPriorityAging && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 uppercase tracking-wide">Aging&nbsp;Interval</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={agingTime}
+                onChange={(e) => setAgingTime(parseInt(e.target.value))}
+                disabled={playbackState !== 'stopped'}
+                className={`w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-rose-500 ${playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+              />
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={agingTime}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value);
+                  if (!isNaN(v) && v >= 1) setAgingTime(v);
+                }}
+                disabled={playbackState !== 'stopped'}
+                className={`w-14 px-2 py-1 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 ${playbackState !== 'stopped' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+              />
+              <span className="text-xs text-gray-400">ms</span>
             </div>
           </div>
         )}
@@ -114,3 +147,4 @@ export default function Controls() {
     </div>
   );
 }
+

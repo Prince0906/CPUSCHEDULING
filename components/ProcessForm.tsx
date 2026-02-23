@@ -8,7 +8,7 @@ import { useSchedulerStore } from '@/lib/store';
 export default function ProcessForm() {
   const { processes, algorithm, addProcess, removeProcess, clearProcesses, loadExample, playbackState, isCompareMode, isMlqMode, mlqQueues } = useSchedulerStore();
   const isRunning = playbackState !== 'stopped';
-  const showPriority = !isMlqMode && (algorithm === 'priority' || algorithm === 'priority-preemptive' || isCompareMode);
+  const showPriority = !isMlqMode && (algorithm === 'priority' || algorithm === 'priority-preemptive' || algorithm === 'priority-aging' || isCompareMode);
   const showQueue = isMlqMode;
 
   const [formData, setFormData] = useState({

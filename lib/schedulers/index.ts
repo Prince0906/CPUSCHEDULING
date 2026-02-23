@@ -2,7 +2,7 @@ import { AlgorithmType, Process, SimulationState, GanttEntry } from '../types';
 import { fcfsScheduler } from './fcfs';
 import { sjfScheduler } from './sjf';
 import { srtfScheduler } from './srtf';
-import { priorityScheduler, priorityPreemptiveScheduler } from './priority';
+import { priorityScheduler, priorityPreemptiveScheduler, priorityAgingScheduler, createPriorityAgingScheduler } from './priority';
 import { roundRobinScheduler } from './roundRobin';
 
 // Scheduler interface that all algorithms implement
@@ -31,6 +31,7 @@ const schedulers: Record<AlgorithmType, Scheduler> = {
   srtf: srtfScheduler,
   priority: priorityScheduler,
   'priority-preemptive': priorityPreemptiveScheduler,
+  'priority-aging': priorityAgingScheduler,
   rr: roundRobinScheduler,
   // MLQ does NOT use the standard Scheduler interface — it runs via mlqTick() in lib/schedulers/mlq.ts
   // This stub satisfies the Record<AlgorithmType, Scheduler> exhaustiveness requirement.
@@ -52,12 +53,16 @@ export function getScheduler(algorithm: AlgorithmType): Scheduler {
 export function executeTick(
   state: SimulationState,
   algorithm: AlgorithmType,
-  timeQuantum: number = 2
+  timeQuantum: number = 2,
+  agingTime: number = 5
 ): SimulationState {
   if (algorithm === 'mlq') {
     throw new Error('MLQ must use mlqTick() from lib/schedulers/mlq.ts, not executeTick().');
   }
-  const scheduler = getScheduler(algorithm);
+  // For priority-aging, create a scheduler with the current agingTime
+  const scheduler = algorithm === 'priority-aging'
+    ? createPriorityAgingScheduler(agingTime)
+    : getScheduler(algorithm);
   const currentTime = state.currentTime;
 
   let processes = [...state.processes];
@@ -275,7 +280,8 @@ export function executeTick(
 export function runFullSimulation(
   initialProcesses: Process[],
   algorithm: AlgorithmType,
-  timeQuantum: number = 2
+  timeQuantum: number = 2,
+  agingTime: number = 5
 ): SimulationState {
   // Reset processes to initial state
   const resetProcesses = initialProcesses.map(p => ({
@@ -306,7 +312,7 @@ export function runFullSimulation(
   let iterations = 0;
 
   while (!state.isComplete && iterations < maxIterations) {
-    state = executeTick(state, algorithm, timeQuantum);
+    state = executeTick(state, algorithm, timeQuantum, agingTime);
     iterations++;
   }
 

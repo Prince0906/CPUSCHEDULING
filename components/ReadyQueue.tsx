@@ -2,10 +2,12 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSchedulerStore } from '@/lib/store';
+import { getEffectivePriority } from '@/lib/schedulers/priority';
 
 export default function ReadyQueue() {
-  const { processes, readyQueue } = useSchedulerStore();
-  
+  const { processes, readyQueue, algorithm, agingTime } = useSchedulerStore();
+  const isPriorityAging = algorithm === 'priority-aging';
+
   const readyProcesses = readyQueue
     .map(id => processes.find(p => p.id === id))
     .filter((p): p is NonNullable<typeof p> => p !== undefined);
@@ -25,23 +27,64 @@ export default function ReadyQueue() {
             </div>
           ) : (
             <div className="p-4 space-y-2">
-              {readyProcesses.map((process, index) => (
-                <motion.div
-                  key={process.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg"
-                >
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: process.color }}
-                  />
-                  <span className="font-medium text-gray-900 text-sm">{process.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{process.remainingCpuTime}ms</span>
-                </motion.div>
-              ))}
+              {readyProcesses.map((process, index) => {
+                const effectivePri = isPriorityAging
+                  ? getEffectivePriority(process, agingTime)
+                  : process.priority;
+                const priorityChanged = isPriorityAging && effectivePri !== process.priority;
+
+                return (
+                  <motion.div
+                    key={process.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: process.color }}
+                    />
+                    <span className="font-medium text-gray-900 text-sm">{process.name}</span>
+
+                    {/* Priority display for priority-aging mode */}
+                    {isPriorityAging && (
+                      <span className="flex items-center gap-1 ml-auto mr-2">
+                        {priorityChanged ? (
+                          <>
+                            <span className="text-xs text-gray-400 line-through">P{process.priority}</span>
+                            <span className="text-xs text-gray-400">→</span>
+                            <motion.span
+                              key={`aged-${process.id}-${effectivePri}`}
+                              initial={{ scale: 1.3, color: '#F43F5E' }}
+                              animate={{ scale: 1, color: '#059669' }}
+                              transition={{ duration: 0.4 }}
+                              className="text-xs font-bold"
+                            >
+                              P{effectivePri}
+                            </motion.span>
+                            <motion.span
+                              key={`badge-${process.id}-${effectivePri}`}
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="ml-0.5 px-1 py-px text-[10px] font-semibold rounded bg-emerald-100 text-emerald-700"
+                            >
+                              AGED
+                            </motion.span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-500">P{process.priority}</span>
+                        )}
+                      </span>
+                    )}
+
+                    <span className={`text-xs text-gray-400 ${isPriorityAging ? '' : 'ml-auto'}`}>
+                      {process.remainingCpuTime}ms
+                    </span>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </AnimatePresence>
@@ -49,3 +92,4 @@ export default function ReadyQueue() {
     </div>
   );
 }
+
