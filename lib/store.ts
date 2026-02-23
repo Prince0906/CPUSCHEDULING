@@ -26,6 +26,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Algorithm selection
   algorithm: 'fcfs',
   timeQuantum: 2,
+  agingTime: 5,
 
   // Process management
   processes: [],
@@ -76,6 +77,11 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Set time quantum for Round Robin
   setTimeQuantum: (quantum) => {
     set({ timeQuantum: Math.max(1, quantum) });
+  },
+
+  // Set aging time for Priority Aging
+  setAgingTime: (time: number) => {
+    set({ agingTime: Math.max(1, time) });
   },
 
   // Add a new process
@@ -286,7 +292,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
 
     for (const algorithm of state.compareAlgorithms) {
       const clonedProcesses = cloneProcessesForSimulation(state.processes);
-      const finalState = runFullSimulation(clonedProcesses, algorithm, state.timeQuantum);
+      const finalState = runFullSimulation(clonedProcesses, algorithm, state.timeQuantum, state.agingTime);
 
       const stats = calculateStatistics(
         finalState.processes,
@@ -569,7 +575,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       currentQuantum: state.currentQuantum,
     };
 
-    const newState = executeTick(simulationState, state.algorithm, state.timeQuantum);
+    const newState = executeTick(simulationState, state.algorithm, state.timeQuantum, state.agingTime);
 
     if (newState.isComplete) {
       if (intervalId) {

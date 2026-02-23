@@ -4,7 +4,7 @@ import { Cpu } from 'lucide-react';
 import { useSchedulerStore } from '@/lib/store';
 import { ALGORITHMS, AlgorithmType } from '@/lib/types';
 
-const algorithms: AlgorithmType[] = ['fcfs', 'sjf', 'srtf', 'priority', 'priority-preemptive', 'rr'];
+const algorithms: AlgorithmType[] = ['fcfs', 'sjf', 'srtf', 'priority', 'priority-preemptive', 'priority-aging', 'rr'];
 
 export default function Header() {
   const {

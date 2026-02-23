@@ -3,9 +3,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cpu } from 'lucide-react';
 import { useSchedulerStore } from '@/lib/store';
+import { getEffectivePriority } from '@/lib/schedulers/priority';
 
 export default function CPUCore() {
-  const { processes, runningProcess, algorithm, timeQuantum, currentQuantum, isMlqMode, mlqQueues, mlqSimState } = useSchedulerStore();
+  const { processes, runningProcess, algorithm, timeQuantum, currentQuantum, isMlqMode, mlqQueues, mlqSimState, agingTime } = useSchedulerStore();
 
   const activeProcess = runningProcess
     ? processes.find(p => p.id === runningProcess)
@@ -21,6 +22,13 @@ export default function CPUCore() {
     : 0;
 
   const isRoundRobin = algorithm === 'rr';
+  const isPriorityAging = algorithm === 'priority-aging';
+
+  // Effective priority for the running process in aging mode
+  const runningEffPri = isPriorityAging && activeProcess
+    ? getEffectivePriority(activeProcess, agingTime)
+    : null;
+  const runningPriChanged = isPriorityAging && activeProcess && runningEffPri !== null && runningEffPri !== activeProcess.priority;
 
   // Ring dimensions
   const RING_SIZE = 140; // px
@@ -128,6 +136,39 @@ export default function CPUCore() {
                 }}
               >
                 Q{activeQueueConfig.id + 1} · {activeQueueConfig.label}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Priority badge (priority-aging only) — shows effective priority of running process */}
+        <AnimatePresence>
+          {isPriorityAging && activeProcess && runningEffPri !== null && (
+            <motion.div
+              key={`pri-badge-${activeProcess.id}`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex justify-center w-full"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                Priority:&nbsp;
+                {runningPriChanged ? (
+                  <>
+                    <span className="line-through opacity-60">{activeProcess.priority}</span>
+                    <span>→</span>
+                    <motion.span
+                      key={`cpu-aged-${runningEffPri}`}
+                      initial={{ scale: 1.3 }}
+                      animate={{ scale: 1 }}
+                      className="font-bold text-emerald-700"
+                    >
+                      {runningEffPri}
+                    </motion.span>
+                  </>
+                ) : (
+                  <span>{activeProcess.priority}</span>
+                )}
               </span>
             </motion.div>
           )}
