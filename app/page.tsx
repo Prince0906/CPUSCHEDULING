@@ -14,9 +14,11 @@ import Statistics from '@/components/Statistics';
 import AlgorithmInfo from '@/components/AlgorithmInfo';
 import CompareMode from '@/components/CompareMode';
 import FlawAnalysis from '@/components/FlawAnalysis';
-import MLQDashboard from '@/components/MLQDashboard';
 import MLQConfig from '@/components/MLQConfig';
+import MLQDashboard from '@/components/MLQDashboard';
 import AgingPanel from '@/components/AgingPanel';
+import MLFQDashboard from '@/components/MLFQDashboard';
+import MLFQConfig from '@/components/MLFQConfig';
 import { Play, Pause, SkipForward, RotateCcw } from 'lucide-react';
 import { SpeedOption } from '@/lib/types';
 
@@ -34,11 +36,20 @@ export default function Home() {
     mlqReset,
     mlqSpeed,
     mlqSetSpeed,
+    isMlfqMode,
+    mlfqPlaybackState,
+    mlfqPlay,
+    mlfqPause,
+    mlfqStep,
+    mlfqReset,
+    mlfqSpeed,
+    mlfqSetSpeed,
     processes,
     isSimulationComplete,
   } = useSchedulerStore();
 
   const mlqIsPlaying = mlqPlaybackState === 'playing';
+  const mlfqIsPlaying = mlfqPlaybackState === 'playing';
   const canPlay = processes.length > 0 && !isSimulationComplete;
 
   return (
@@ -52,6 +63,8 @@ export default function Home() {
             <ProcessForm />
             {isMlqMode ? (
               <MLQConfig />
+            ) : isMlfqMode ? (
+              <MLFQConfig />
             ) : (
               !isCompareMode && (
                 <AlgorithmInfo />
@@ -114,6 +127,61 @@ export default function Home() {
 
                 {/* MLQ visualization */}
                 <MLQDashboard />
+
+                {/* Process table below */}
+                <ProcessTable />
+              </>
+            ) : isMlfqMode ? (
+              <>
+                {/* MLFQ Playback Controls */}
+                <div className="card flex items-center gap-3 px-5 py-3">
+                  <button
+                    onClick={mlfqIsPlaying ? mlfqPause : mlfqPlay}
+                    disabled={!canPlay && !mlfqIsPlaying}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${mlfqIsPlaying
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                      : canPlay
+                        ? 'bg-teal-500 hover:bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                  >
+                    {mlfqIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  </button>
+                  <button
+                    onClick={mlfqStep}
+                    disabled={mlfqIsPlaying || !canPlay}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <SkipForward className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={mlfqReset}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+                  {/* Speed selector — right side */}
+                  <div className="ml-auto flex items-center gap-3">
+                    <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Speed</span>
+                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                      {SPEEDS.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => mlfqSetSpeed(s)}
+                          className={`px-3.5 py-1.5 text-sm font-semibold rounded-md transition-colors ${mlfqSpeed === s
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                          {s}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* MLFQ visualization */}
+                <MLFQDashboard />
 
                 {/* Process table below */}
                 <ProcessTable />

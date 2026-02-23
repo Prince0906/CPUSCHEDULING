@@ -6,7 +6,7 @@ import { useSchedulerStore } from '@/lib/store';
 import { getEffectivePriority } from '@/lib/schedulers/priority';
 
 export default function CPUCore() {
-  const { processes, runningProcess, algorithm, timeQuantum, currentQuantum, isMlqMode, mlqQueues, mlqSimState, agingTime } = useSchedulerStore();
+  const { processes, runningProcess, algorithm, timeQuantum, currentQuantum, isMlqMode, mlqQueues, mlqSimState, isMlfqMode, mlfqQueues, mlfqSimState, agingTime } = useSchedulerStore();
 
   const activeProcess = runningProcess
     ? processes.find(p => p.id === runningProcess)
@@ -15,6 +15,11 @@ export default function CPUCore() {
   // In MLQ mode, find the active queue config for the running process
   const activeQueueConfig = isMlqMode && activeProcess
     ? mlqQueues.find(q => q.id === activeProcess.queueLevel) ?? null
+    : null;
+
+  // In MLFQ mode, find the active queue config for the running process
+  const activeMlfqQueueConfig = isMlfqMode && activeProcess
+    ? mlfqQueues.find(q => q.id === activeProcess.queueLevel) ?? null
     : null;
 
   const progress = activeProcess && activeProcess.cpuBurstTime > 0
@@ -139,6 +144,60 @@ export default function CPUCore() {
               </span>
             </motion.div>
           )}
+
+          {activeMlfqQueueConfig && activeProcess && (
+            <motion.div
+              key={`mlfq-${activeMlfqQueueConfig.id}`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex justify-center w-full"
+            >
+              <span
+                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: `${activeMlfqQueueConfig.accentHex}18`,
+                  color: activeMlfqQueueConfig.accentHex,
+                  border: `1px solid ${activeMlfqQueueConfig.accentHex}30`,
+                }}
+              >
+                Q{activeMlfqQueueConfig.id} · {activeMlfqQueueConfig.label}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Priority badge (priority-aging only) — shows effective priority of running process */}
+        <AnimatePresence>
+          {isPriorityAging && activeProcess && runningEffPri !== null && (
+            <motion.div
+              key={`pri-badge-${activeProcess.id}`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex justify-center w-full"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                Priority:&nbsp;
+                {runningPriChanged ? (
+                  <>
+                    <span className="line-through opacity-60">{activeProcess.priority}</span>
+                    <span>→</span>
+                    <motion.span
+                      key={`cpu-aged-${runningEffPri}`}
+                      initial={{ scale: 1.3 }}
+                      animate={{ scale: 1 }}
+                      className="font-bold text-emerald-700"
+                    >
+                      {runningEffPri}
+                    </motion.span>
+                  </>
+                ) : (
+                  <span>{activeProcess.priority}</span>
+                )}
+              </span>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Priority badge (priority-aging only) — shows effective priority of running process */}
@@ -215,6 +274,25 @@ export default function CPUCore() {
           </div>
         )}
 
+        {/* Quantum bar — MLFQ queue */}
+        {isMlfqMode && activeMlfqQueueConfig && activeProcess && (
+          <div className="w-full px-2">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="text-gray-500">Q{activeMlfqQueueConfig.id} Quantum</span>
+              <span className="font-medium text-gray-700 tabular-nums">
+                {mlfqSimState?.currentQuantum ?? 0}/{activeMlfqQueueConfig.timeQuantum}ms
+              </span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: activeMlfqQueueConfig.accentHex }}
+                animate={{ width: `${Math.min(((mlfqSimState?.currentQuantum ?? 0) / activeMlfqQueueConfig.timeQuantum) * 100, 100)}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

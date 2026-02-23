@@ -109,6 +109,7 @@ export function createProcess(
     color: getProcessColor(colorIndex),
     priority: input.priority,
     queueLevel: input.queueLevel ?? 2, // default: Batch (Q3)
+    cpuTimeUsedInCurrentQueue: 0,
   };
 }
 
@@ -134,6 +135,17 @@ export function getMlqExampleProcesses(): ProcessInput[] {
   ];
 }
 
+// MLFQ demo: 5 processes demonstrating demotion and I/O
+export function getMlfqExampleProcesses(): ProcessInput[] {
+  return [
+    { name: 'P1', arrivalTime: 0, cpuBurstTime: 12, ioBurstTime: 0, priority: 1, queueLevel: 0 }, // CPU bound, will demote to Q2
+    { name: 'P2', arrivalTime: 2, cpuBurstTime: 3, ioBurstTime: 5, priority: 2, queueLevel: 0 },  // I/O bound, stays in Q0
+    { name: 'P3', arrivalTime: 4, cpuBurstTime: 10, ioBurstTime: 0, priority: 3, queueLevel: 0 }, // CPU bound, will demote
+    { name: 'P4', arrivalTime: 15, cpuBurstTime: 4, ioBurstTime: 0, priority: 4, queueLevel: 0 }, // Short job arriving later
+    { name: 'P5', arrivalTime: 20, cpuBurstTime: 25, ioBurstTime: 0, priority: 5, queueLevel: 0 }, // Long job, needs boost
+  ];
+}
+
 // Clone processes for comparison mode (reset to initial state)
 export function cloneProcessesForSimulation(processes: Process[]): Process[] {
   return processes.map(p => ({
@@ -145,5 +157,6 @@ export function cloneProcessesForSimulation(processes: Process[]): Process[] {
     completionTime: null,
     waitingTime: 0,
     responseTime: null,
+    cpuTimeUsedInCurrentQueue: 0,
   }));
 }

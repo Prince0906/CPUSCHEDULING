@@ -12,15 +12,20 @@ import {
   QueueConfig,
   MLQSimulationState,
   DEFAULT_MLQ_QUEUES,
+  MLFQSimulationState,
+  MLFQQueueConfig,
+  DEFAULT_MLFQ_QUEUES,
 } from './types';
-import { createProcess, getExampleProcesses, getMlqExampleProcesses, calculateStatistics, getProcessStats, cloneProcessesForSimulation } from './utils';
+import { createProcess, getExampleProcesses, getMlqExampleProcesses, getMlfqExampleProcesses, calculateStatistics, getProcessStats, cloneProcessesForSimulation } from './utils';
 import { executeTick, runFullSimulation } from './schedulers';
 import { mlqTick, createInitialMlqState } from './schedulers/mlq';
+import { mlfqTick, createInitialMlfqState } from './schedulers/mlfq';
 import { AnalysisResult } from './analysis/types';
 import { analyzeSimulation, prepareSimulationData } from './analysis/openai';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let mlqIntervalId: ReturnType<typeof setInterval> | null = null;
+let mlfqIntervalId: ReturnType<typeof setInterval> | null = null;
 
 export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   // Algorithm selection
@@ -63,6 +68,14 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   mlqSimState: null as MLQSimulationState | null,
   mlqPlaybackState: 'stopped' as PlaybackState,
   mlqSpeed: 1 as SpeedOption,
+
+  // ── MLFQ mode state ───────────────────────────────────────────────────────
+  isMlfqMode: false,
+  mlfqQueues: DEFAULT_MLFQ_QUEUES as MLFQQueueConfig[],
+  mlfqSimState: null as MLFQSimulationState | null,
+  mlfqPlaybackState: 'stopped' as PlaybackState,
+  mlfqSpeed: 1 as SpeedOption,
+  boostTimerLimit: 20,
 
   // Set algorithm
   setAlgorithm: (algorithm) => {
@@ -116,6 +129,9 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     if (state.mlqPlaybackState === 'playing') {
       get().mlqPause();
     }
+    if (state.mlfqPlaybackState === 'playing') {
+      get().mlfqPause();
+    }
     set({
       processes: [],
       readyQueue: [],
@@ -130,6 +146,8 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       compareResults: [],
       mlqSimState: null,
       mlqPlaybackState: 'stopped',
+      mlfqSimState: null,
+      mlfqPlaybackState: 'stopped',
       // Clear analysis
       analysisResult: null,
       analysisError: null,
@@ -145,8 +163,16 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     if (state.mlqPlaybackState === 'playing') {
       get().mlqPause();
     }
+    if (state.mlfqPlaybackState === 'playing') {
+      get().mlfqPause();
+    }
 
-    const exampleData = state.isMlqMode ? getMlqExampleProcesses() : getExampleProcesses();
+    let exampleData = getExampleProcesses();
+    if (state.isMlqMode) {
+      exampleData = getMlqExampleProcesses();
+    } else if (state.isMlfqMode) {
+      exampleData = getMlfqExampleProcesses();
+    }
     const newProcesses = exampleData.map((data, index) => createProcess(data, index));
 
     set({
@@ -163,6 +189,8 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       compareResults: [],
       mlqSimState: null,
       mlqPlaybackState: 'stopped',
+      mlfqSimState: null,
+      mlfqPlaybackState: 'stopped',
       // Clear analysis when loading example
       analysisResult: null,
       analysisError: null,
@@ -222,6 +250,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       completionTime: null,
       waitingTime: 0,
       responseTime: null,
+      cpuTimeUsedInCurrentQueue: 0,
     }));
 
     set({
@@ -242,6 +271,10 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     // Also reset MLQ state if in MLQ mode
     if (state.isMlqMode) {
       get().mlqReset();
+    }
+    // Also reset MLFQ state if in MLFQ mode
+    if (state.isMlfqMode) {
+      get().mlfqReset();
     }
   },
 
@@ -390,10 +423,13 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     if (state.playbackState === 'playing') get().pause();
     // Stop any running MLQ sim
     if (state.mlqPlaybackState === 'playing') get().mlqPause();
+    if (state.mlfqPlaybackState === 'playing') get().mlfqPause();
 
     const entering = !state.isMlqMode;
+    const newMlfqMode = entering ? false : state.isMlfqMode;
     set({
       isMlqMode: entering,
+      isMlfqMode: newMlfqMode,
       algorithm: entering ? 'mlq' : 'fcfs',
       // Reset single-algo simulation state
       readyQueue: [],
@@ -406,9 +442,11 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       ganttChart: [],
       currentQuantum: 0,
       compareResults: [],
-      // Reset MLQ simulation
+      // Reset MLQ & MLFQ simulation
       mlqSimState: null,
       mlqPlaybackState: 'stopped',
+      mlfqSimState: null,
+      mlfqPlaybackState: 'stopped',
       // Keep processes but reset their state
       processes: state.processes.map((p) => ({
         ...p,
@@ -419,6 +457,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         completionTime: null,
         waitingTime: 0,
         responseTime: null,
+        cpuTimeUsedInCurrentQueue: 0,
       })),
       analysisResult: null,
       analysisError: null,
@@ -504,6 +543,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         completionTime: null,
         waitingTime: 0,
         responseTime: null,
+        cpuTimeUsedInCurrentQueue: 0,
       })),
     });
   },
@@ -551,6 +591,180 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     set({
       mlqSimState: newState,
       // Sync top-level state for components that read from root (CPUCore, header clock, etc.)
+      currentTime: newState.currentTime,
+      processes: newState.processes,
+      ganttChart: newState.ganttChart,
+      runningProcess: newState.runningProcess,
+      completedProcesses: newState.completedProcesses,
+    });
+  },
+
+  // ── MLFQ Mode Actions ─────────────────────────────────────────────────────
+
+  toggleMlfqMode: () => {
+    const state = get();
+    if (state.playbackState === 'playing') get().pause();
+    if (state.mlqPlaybackState === 'playing') get().mlqPause();
+    if (state.mlfqPlaybackState === 'playing') get().mlfqPause();
+
+    const entering = !state.isMlfqMode;
+    const newMlqMode = entering ? false : state.isMlqMode;
+
+    set({
+      isMlfqMode: entering,
+      isMlqMode: newMlqMode,
+      algorithm: entering ? 'mlfq' : 'fcfs',
+      // Reset single-algo simulation state
+      readyQueue: [],
+      ioQueue: [],
+      runningProcess: null,
+      completedProcesses: [],
+      currentTime: 0,
+      playbackState: 'stopped',
+      isSimulationComplete: false,
+      ganttChart: [],
+      currentQuantum: 0,
+      compareResults: [],
+      // Reset MLQ & MLFQ simulation
+      mlqSimState: null,
+      mlqPlaybackState: 'stopped',
+      mlfqSimState: null,
+      mlfqPlaybackState: 'stopped',
+      // Keep processes but reset their state
+      processes: state.processes.map((p) => ({
+        ...p,
+        remainingCpuTime: p.cpuBurstTime,
+        remainingIoTime: p.ioBurstTime,
+        state: 'new' as const,
+        startTime: null,
+        completionTime: null,
+        waitingTime: 0,
+        responseTime: null,
+        cpuTimeUsedInCurrentQueue: 0,
+      })),
+      analysisResult: null,
+      analysisError: null,
+    });
+  },
+
+  updateMlfqQueueConfig: (queueId: 0 | 1 | 2, patch: Partial<MLFQQueueConfig>) => {
+    const state = get();
+    const newQueues = state.mlfqQueues.map((q) =>
+      q.id === queueId ? { ...q, ...patch } : q
+    ) as MLFQQueueConfig[];
+    set({ mlfqQueues: newQueues });
+  },
+
+  setBoostTimerLimit: (limit: number) => {
+    set({ boostTimerLimit: Math.max(1, limit) });
+  },
+
+  mlfqPlay: () => {
+    const state = get();
+    if (state.processes.length === 0) return;
+
+    let simState = state.mlfqSimState;
+    if (!simState) {
+      simState = createInitialMlfqState(state.processes, state.boostTimerLimit);
+    }
+    if (simState.isComplete) return;
+
+    set({ mlfqPlaybackState: 'playing', mlfqSimState: simState });
+
+    const baseInterval = 1000;
+    const interval = baseInterval / state.mlfqSpeed;
+    mlfqIntervalId = setInterval(() => {
+      get().mlfqTick();
+    }, interval);
+  },
+
+  mlfqPause: () => {
+    if (mlfqIntervalId) {
+      clearInterval(mlfqIntervalId);
+      mlfqIntervalId = null;
+    }
+    set({ mlfqPlaybackState: 'paused' });
+  },
+
+  mlfqStep: () => {
+    const state = get();
+    if (state.mlfqPlaybackState === 'playing') get().mlfqPause();
+    let simState = state.mlfqSimState;
+    if (!simState) {
+      simState = createInitialMlfqState(state.processes, state.boostTimerLimit);
+      set({ mlfqSimState: simState });
+    }
+    if (simState.isComplete) return;
+    get().mlfqTick();
+  },
+
+  mlfqReset: () => {
+    if (mlfqIntervalId) {
+      clearInterval(mlfqIntervalId);
+      mlfqIntervalId = null;
+    }
+    const state = get();
+    set({
+      mlfqSimState: null,
+      mlfqPlaybackState: 'stopped',
+      runningProcess: null,
+      currentTime: 0,
+      ganttChart: [],
+      completedProcesses: [],
+      isSimulationComplete: false,
+      processes: state.processes.map((p) => ({
+        ...p,
+        remainingCpuTime: p.cpuBurstTime,
+        remainingIoTime: p.ioBurstTime,
+        state: 'new' as const,
+        startTime: null,
+        completionTime: null,
+        waitingTime: 0,
+        responseTime: null,
+        cpuTimeUsedInCurrentQueue: 0,
+      })),
+    });
+  },
+
+  mlfqSetSpeed: (speed: SpeedOption) => {
+    const state = get();
+    set({ mlfqSpeed: speed });
+    if (state.mlfqPlaybackState === 'playing') {
+      if (mlfqIntervalId) clearInterval(mlfqIntervalId);
+      const interval = 1000 / speed;
+      mlfqIntervalId = setInterval(() => {
+        get().mlfqTick();
+      }, interval);
+    }
+  },
+
+  mlfqTick: () => {
+    const state = get();
+    const simState = state.mlfqSimState;
+    if (!simState || simState.isComplete) return;
+
+    const newState = mlfqTick(simState, state.mlfqQueues, state.boostTimerLimit);
+
+    if (newState.isComplete) {
+      if (mlfqIntervalId) {
+        clearInterval(mlfqIntervalId);
+        mlfqIntervalId = null;
+      }
+      set({
+        mlfqSimState: newState,
+        mlfqPlaybackState: 'stopped',
+        isSimulationComplete: true,
+        currentTime: newState.currentTime,
+        processes: newState.processes,
+        ganttChart: newState.ganttChart,
+        runningProcess: newState.runningProcess,
+        completedProcesses: newState.completedProcesses,
+      });
+      return;
+    }
+
+    set({
+      mlfqSimState: newState,
       currentTime: newState.currentTime,
       processes: newState.processes,
       ganttChart: newState.ganttChart,

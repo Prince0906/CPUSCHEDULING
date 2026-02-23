@@ -10,7 +10,8 @@ export type AlgorithmType =
   | 'priority-preemptive'
   | 'priority-aging'
   | 'rr'
-  | 'mlq';
+  | 'mlq'
+  | 'mlfq';
 
 // MLQ process type — determines which queue a process belongs to
 export type ProcessType = 'system' | 'interactive' | 'batch' | 'background';
@@ -34,6 +35,24 @@ export const DEFAULT_MLQ_QUEUES: QueueConfig[] = [
   { id: 1, label: 'Interactive', processType: 'interactive', algorithm: 'rr', timeQuantum: 4, ringColor: 'ring-violet-400', bgTint: 'bg-violet-50', accentHex: '#8B5CF6', labelColor: 'text-violet-700' },
   { id: 2, label: 'Batch', processType: 'batch', algorithm: 'sjf', timeQuantum: 2, ringColor: 'ring-amber-400', bgTint: 'bg-amber-50', accentHex: '#F59E0B', labelColor: 'text-amber-700' },
   { id: 3, label: 'Background', processType: 'background', algorithm: 'fcfs', timeQuantum: 2, ringColor: 'ring-gray-300', bgTint: 'bg-gray-50', accentHex: '#6B7280', labelColor: 'text-gray-600' },
+];
+
+// Config for a single MLFQ queue level
+export interface MLFQQueueConfig {
+  id: 0 | 1 | 2;
+  label: string;
+  timeQuantum: number;
+  ringColor: string;
+  bgTint: string;
+  accentHex: string;
+  labelColor: string;
+}
+
+// Default 3-queue configuration for MLFQ
+export const DEFAULT_MLFQ_QUEUES: MLFQQueueConfig[] = [
+  { id: 0, label: 'Highest Priority (Q0)', timeQuantum: 4, ringColor: 'ring-emerald-400', bgTint: 'bg-emerald-50', accentHex: '#10B981', labelColor: 'text-emerald-700' },
+  { id: 1, label: 'Medium Priority (Q1)', timeQuantum: 8, ringColor: 'ring-blue-400', bgTint: 'bg-blue-50', accentHex: '#3B82F6', labelColor: 'text-blue-700' },
+  { id: 2, label: 'Lowest Priority (Q2)', timeQuantum: 16, ringColor: 'ring-violet-400', bgTint: 'bg-violet-50', accentHex: '#8B5CF6', labelColor: 'text-violet-700' },
 ];
 
 // Algorithm metadata for UI
@@ -139,6 +158,17 @@ export const ALGORITHMS: Record<AlgorithmType, AlgorithmInfo> = {
     cons: ['Starvation of lower queues', 'No process migration between queues', 'Static queue assignment'],
     timeComplexity: 'O(n) per tick',
   },
+  mlfq: {
+    id: 'mlfq',
+    name: 'Multi-Level Feedback Queue',
+    shortName: 'MLFQ',
+    description: 'Processes move between queues based on CPU behavior. CPU-bound tasks are demoted to lower priority queues with longer time slices, while I/O-bound tasks remain at high priority.',
+    isPreemptive: true,
+    selectionCriteria: 'Highest priority queue. CPU usage demotes, I/O preserves priority.',
+    pros: ['Rewards I/O bound processes', 'Prevents starvation (with priority boost)', 'Highly adaptive'],
+    cons: ['Complex implementation', 'Requires configuring multiple parameters', 'CPU bound tasks may suffer'],
+    timeComplexity: 'O(n) per tick',
+  },
 };
 
 // Individual process representation
@@ -157,7 +187,8 @@ export interface Process {
   responseTime: number | null;
   color: string;
   priority: number;          // For priority scheduling (1 = highest priority)
-  queueLevel: 0 | 1 | 2 | 3; // For MLQ — which queue this process belongs to (default: 2 = Batch)
+  queueLevel: 0 | 1 | 2 | 3; // For MLQ and MLFQ — which queue this process belongs to
+  cpuTimeUsedInCurrentQueue: number; // For MLFQ — how much CPU time used since last entered current queue
 }
 
 // Entry for Gantt chart visualization
@@ -189,6 +220,21 @@ export interface MLQSimulationState {
   currentQuantum: number;
   contextSwitchCount: number;                        // how many times the active queue changed
   starvationMap: Record<string, number>;             // pid → consecutive ticks without CPU
+}
+
+// Full MLFQ simulation state
+export interface MLFQSimulationState {
+  processes: Process[];
+  queues: [string[], string[], string[]]; // ready pid lists per queue level
+  ioQueue: string[];                                 // global I/O queue
+  runningProcess: string | null;
+  activeQueueId: 0 | 1 | 2 | null;             // which queue currently has the CPU
+  completedProcesses: string[];
+  currentTime: number;
+  ganttChart: MLQGanttEntry[];
+  isComplete: boolean;
+  currentQuantum: number;
+  boostTimeRemaining: number;
 }
 
 // Simulation playback state
@@ -286,11 +332,19 @@ export interface SchedulerState {
   mlqPlaybackState: PlaybackState;
   mlqSpeed: SpeedOption;
 
+  // MLFQ mode state
+  isMlfqMode: boolean;
+  mlfqQueues: MLFQQueueConfig[];
+  mlfqSimState: MLFQSimulationState | null;
+  mlfqPlaybackState: PlaybackState;
+  mlfqSpeed: SpeedOption;
+  boostTimerLimit: number;
+
   // Actions
   setAlgorithm: (algorithm: AlgorithmType) => void;
   setTimeQuantum: (quantum: number) => void;
   setAgingTime: (time: number) => void;
-  addProcess: (process: Omit<Process, 'id' | 'remainingCpuTime' | 'remainingIoTime' | 'state' | 'startTime' | 'completionTime' | 'waitingTime' | 'responseTime' | 'color'>) => void;
+  addProcess: (input: Omit<Process, 'id' | 'remainingCpuTime' | 'remainingIoTime' | 'state' | 'startTime' | 'completionTime' | 'waitingTime' | 'responseTime' | 'color' | 'cpuTimeUsedInCurrentQueue'>) => void;
   removeProcess: (id: string) => void;
   clearProcesses: () => void;
   loadExample: () => void;
@@ -320,9 +374,20 @@ export interface SchedulerState {
   mlqReset: () => void;
   mlqSetSpeed: (speed: SpeedOption) => void;
 
+  // MLFQ mode actions
+  toggleMlfqMode: () => void;
+  updateMlfqQueueConfig: (queueId: 0 | 1 | 2, patch: Partial<MLFQQueueConfig>) => void;
+  setBoostTimerLimit: (limit: number) => void;
+  mlfqPlay: () => void;
+  mlfqPause: () => void;
+  mlfqStep: () => void;
+  mlfqReset: () => void;
+  mlfqSetSpeed: (speed: SpeedOption) => void;
+
   // Internal simulation methods
   tick: () => void;
   mlqTick: () => void;
+  mlfqTick: () => void;
 }
 
 // Process input type (for form)
@@ -368,4 +433,5 @@ export const ALGORITHM_COLORS: Record<AlgorithmType, string> = {
   'priority-aging': '#F43F5E',
   rr: '#10B981',
   mlq: '#7C3AED',
+  mlfq: '#14B8A6',
 };
