@@ -81,30 +81,6 @@ export default function Header() {
     }
   };
 
-  // Clicking a regular algorithm: auto-exit Compare or MLQ if active, then switch.
-  const handleAlgorithmClick = (algo: AlgorithmType) => {
-    if (isRunning) return;
-    if (isCompareMode) {
-      toggleCompareMode();
-      setTimeout(() => setAlgorithm(algo), 0);
-    } else if (isMlqMode) {
-      toggleMlqMode();
-      setTimeout(() => setAlgorithm(algo), 0);
-    } else {
-      setAlgorithm(algo);
-    }
-  };
-
-  // Clicking Compare: auto-exit MLQ if active, then enter Compare Mode.
-  const handleCompareClick = () => {
-    if (isRunning) return;
-    if (isMlqMode) {
-      toggleMlqMode();
-      setTimeout(() => toggleCompareMode(), 0);
-    } else {
-      toggleCompareMode();
-    }
-  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
