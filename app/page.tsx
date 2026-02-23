@@ -15,6 +15,7 @@ import AlgorithmInfo from '@/components/AlgorithmInfo';
 import CompareMode from '@/components/CompareMode';
 import FlawAnalysis from '@/components/FlawAnalysis';
 import MLQConfig from '@/components/MLQConfig';
+import MLQDashboard from '@/components/MLQDashboard';
 import AgingPanel from '@/components/AgingPanel';
 import MLFQDashboard from '@/components/MLFQDashboard';
 import MLFQConfig from '@/components/MLFQConfig';
@@ -123,6 +124,9 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+
+                {/* MLQ visualization */}
+                <MLQDashboard />
 
                 {/* Process table below */}
                 <ProcessTable />
