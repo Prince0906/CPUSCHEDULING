@@ -8,6 +8,7 @@ export type AlgorithmType =
   | 'srtf'
   | 'priority'
   | 'priority-preemptive'
+  | 'priority-aging'
   | 'rr'
   | 'mlq'
   | 'mlfq';
@@ -122,6 +123,17 @@ export const ALGORITHMS: Record<AlgorithmType, AlgorithmInfo> = {
     selectionCriteria: 'Highest priority process (preempts if higher arrives)',
     pros: ['Immediate response to high priority', 'Better for real-time systems'],
     cons: ['More context switches', 'Starvation risk', 'Priority inversion'],
+    timeComplexity: 'O(n)',
+  },
+  'priority-aging': {
+    id: 'priority-aging',
+    name: 'Priority (Preemptive + Aging)',
+    shortName: 'Aging',
+    description: 'Preemptive priority scheduling with aging. Waiting processes gradually gain higher priority to prevent starvation.',
+    isPreemptive: true,
+    selectionCriteria: 'Effective priority = original − (waitingTime ÷ agingTime). Preempts if aged priority surpasses running process.',
+    pros: ['Prevents starvation', 'Dynamic priority adjustment', 'Fair to long-waiting processes'],
+    cons: ['More complex priority tracking', 'Aging interval tuning required', 'More context switches'],
     timeComplexity: 'O(n)',
   },
   rr: {
@@ -282,6 +294,7 @@ export interface SchedulerState {
   // Algorithm selection
   algorithm: AlgorithmType;
   timeQuantum: number; // For Round Robin
+  agingTime: number; // For Priority Aging
 
   // Process management
   processes: Process[];
@@ -330,6 +343,7 @@ export interface SchedulerState {
   // Actions
   setAlgorithm: (algorithm: AlgorithmType) => void;
   setTimeQuantum: (quantum: number) => void;
+  setAgingTime: (time: number) => void;
   addProcess: (input: Omit<Process, 'id' | 'remainingCpuTime' | 'remainingIoTime' | 'state' | 'startTime' | 'completionTime' | 'waitingTime' | 'responseTime' | 'color' | 'cpuTimeUsedInCurrentQueue'>) => void;
   removeProcess: (id: string) => void;
   clearProcesses: () => void;
@@ -416,6 +430,7 @@ export const ALGORITHM_COLORS: Record<AlgorithmType, string> = {
   srtf: '#EC4899',
   priority: '#F97316',
   'priority-preemptive': '#EF4444',
+  'priority-aging': '#F43F5E',
   rr: '#10B981',
   mlq: '#7C3AED',
   mlfq: '#14B8A6',
