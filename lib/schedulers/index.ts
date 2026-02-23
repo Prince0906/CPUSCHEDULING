@@ -41,6 +41,13 @@ const schedulers: Record<AlgorithmType, Scheduler> = {
     selectNextProcess: () => { throw new Error('MLQ must use mlqTick(), not executeTick().'); },
     shouldPreempt: () => { throw new Error('MLQ must use mlqTick(), not executeTick().'); },
   },
+  mlfq: {
+    id: 'mlfq',
+    name: 'Multi-Level Feedback Queue',
+    isPreemptive: true,
+    selectNextProcess: () => { throw new Error('MLFQ must use mlfqTick(), not executeTick().'); },
+    shouldPreempt: () => { throw new Error('MLFQ must use mlfqTick(), not executeTick().'); },
+  },
 };
 
 // Get scheduler by algorithm type
@@ -56,6 +63,9 @@ export function executeTick(
 ): SimulationState {
   if (algorithm === 'mlq') {
     throw new Error('MLQ must use mlqTick() from lib/schedulers/mlq.ts, not executeTick().');
+  }
+  if (algorithm === 'mlfq') {
+    throw new Error('MLFQ must use mlfqTick() from lib/schedulers/mlfq.ts, not executeTick().');
   }
   const scheduler = getScheduler(algorithm);
   const currentTime = state.currentTime;

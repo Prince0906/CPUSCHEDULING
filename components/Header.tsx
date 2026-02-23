@@ -17,9 +17,12 @@ export default function Header() {
     isMlqMode,
     toggleMlqMode,
     mlqPlaybackState,
+    isMlfqMode,
+    toggleMlfqMode,
+    mlfqPlaybackState,
   } = useSchedulerStore();
 
-  const isRunning = playbackState !== 'stopped' || mlqPlaybackState !== 'stopped';
+  const isRunning = playbackState !== 'stopped' || mlqPlaybackState !== 'stopped' || mlfqPlaybackState !== 'stopped';
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
@@ -39,17 +42,17 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-1">
             {algorithms.map((algo) => {
               const info = ALGORITHMS[algo];
-              const isSelected = algorithm === algo && !isCompareMode && !isMlqMode;
+              const isSelected = algorithm === algo && !isCompareMode && !isMlqMode && !isMlfqMode;
 
               return (
                 <button
                   key={algo}
-                  onClick={() => !isRunning && !isCompareMode && !isMlqMode && setAlgorithm(algo)}
-                  disabled={isRunning || isCompareMode || isMlqMode}
+                  onClick={() => !isRunning && !isCompareMode && !isMlqMode && !isMlfqMode && setAlgorithm(algo)}
+                  disabled={isRunning || isCompareMode || isMlqMode || isMlfqMode}
                   className={`px-3 py-2 text-sm font-medium transition-colors relative ${isSelected
-                      ? 'text-sky-600'
-                      : 'text-gray-500 hover:text-gray-900'
-                    } ${isRunning || isCompareMode || isMlqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    ? 'text-sky-600'
+                    : 'text-gray-500 hover:text-gray-900'
+                    } ${isRunning || isCompareMode || isMlqMode || isMlfqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {info.shortName}
                   {isSelected && (
@@ -66,8 +69,8 @@ export default function Header() {
               onClick={() => !isRunning && toggleMlqMode()}
               disabled={isRunning || isCompareMode}
               className={`px-3 py-2 text-sm font-medium transition-colors relative ${isMlqMode
-                  ? 'text-violet-600'
-                  : 'text-gray-500 hover:text-gray-900'
+                ? 'text-violet-600'
+                : 'text-gray-500 hover:text-gray-900'
                 } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               MLQ
@@ -78,13 +81,30 @@ export default function Header() {
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
+            {/* MLFQ tab — teal accent, toggles isMlfqMode */}
             <button
-              onClick={() => !isRunning && !isMlqMode && toggleCompareMode()}
-              disabled={isRunning || isMlqMode}
+              onClick={() => !isRunning && toggleMlfqMode()}
+              disabled={isRunning || isCompareMode}
+              className={`px-3 py-2 text-sm font-medium transition-colors relative ${isMlfqMode
+                ? 'text-teal-600'
+                : 'text-gray-500 hover:text-gray-900'
+                } ${isRunning || isCompareMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              MLFQ
+              {isMlfqMode && (
+                <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-teal-500 rounded-full" />
+              )}
+            </button>
+
+            <div className="w-px h-6 bg-gray-200 mx-1" />
+
+            <button
+              onClick={() => !isRunning && !isMlqMode && !isMlfqMode && toggleCompareMode()}
+              disabled={isRunning || isMlqMode || isMlfqMode}
               className={`px-3 py-2 text-sm font-medium transition-colors ${isCompareMode
-                  ? 'text-sky-600'
-                  : 'text-gray-500 hover:text-gray-900'
-                } ${isRunning || isMlqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                ? 'text-sky-600'
+                : 'text-gray-500 hover:text-gray-900'
+                } ${isRunning || isMlqMode || isMlfqMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Compare
             </button>
