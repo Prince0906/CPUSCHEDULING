@@ -200,6 +200,39 @@ export default function CPUCore() {
           )}
         </AnimatePresence>
 
+        {/* Priority badge (priority-aging only) — shows effective priority of running process */}
+        <AnimatePresence>
+          {isPriorityAging && activeProcess && runningEffPri !== null && (
+            <motion.div
+              key={`pri-badge-${activeProcess.id}`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex justify-center w-full"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                Priority:&nbsp;
+                {runningPriChanged ? (
+                  <>
+                    <span className="line-through opacity-60">{activeProcess.priority}</span>
+                    <span>→</span>
+                    <motion.span
+                      key={`cpu-aged-${runningEffPri}`}
+                      initial={{ scale: 1.3 }}
+                      animate={{ scale: 1 }}
+                      className="font-bold text-emerald-700"
+                    >
+                      {runningEffPri}
+                    </motion.span>
+                  </>
+                ) : (
+                  <span>{activeProcess.priority}</span>
+                )}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Quantum bar — standard RR mode */}
         {isRoundRobin && !isMlqMode && activeProcess && (
           <div className="w-full px-2">
