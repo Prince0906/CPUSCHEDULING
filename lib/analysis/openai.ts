@@ -1,4 +1,4 @@
-import { AnalysisResult, SimulationDataForAnalysis, FlawDetection, FlawType, FlawSeverity } from './types';
+import { AnalysisResult, SimulationDataForAnalysis, MLQAnalysisContext, FlawDetection, FlawType, FlawSeverity } from './types';
 import { buildAnalysisPrompt, SYSTEM_PROMPT } from './prompts';
 import { AlgorithmType, ALGORITHMS } from '../types';
 
@@ -262,6 +262,9 @@ const VALID_FLAW_TYPES: FlawType[] = [
   'high_waiting',
   'priority_issue',
   'quantum_inefficiency',
+  'queue_starvation',
+  'demotion_heavy',
+  'boost_dependency',
 ];
 
 const VALID_SEVERITIES: FlawSeverity[] = ['low', 'medium', 'high'];
@@ -274,6 +277,7 @@ const VALID_ALGORITHMS: AlgorithmType[] = [
   'priority-preemptive',
   'rr',
   'mlq',
+  'mlfq',
 ];
 
 function validateFlawType(type: string): FlawType {
@@ -332,7 +336,8 @@ export function prepareSimulationData(
     cpuUtilization: number;
     totalTime: number;
   },
-  timeQuantum?: number
+  timeQuantum?: number,
+  mlqContext?: MLQAnalysisContext
 ): SimulationDataForAnalysis {
   // Count context switches (number of Gantt entries minus idle periods minus 1)
   const contextSwitches = ganttChart.filter(g => g.processId !== null).length - 1;
@@ -357,5 +362,6 @@ export function prepareSimulationData(
       ...statistics,
       contextSwitches: Math.max(0, contextSwitches),
     },
+    mlqContext,
   };
 }

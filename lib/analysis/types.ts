@@ -7,7 +7,10 @@ export type FlawType =
   | 'context_switches' // Too many preemptions (RR)
   | 'high_waiting'     // Process waits too long
   | 'priority_issue'   // Priority inversion or unfairness
-  | 'quantum_inefficiency'; // RR quantum too small/large
+  | 'quantum_inefficiency' // RR quantum too small/large
+  | 'queue_starvation'    // MLQ: lower-priority queues never get CPU
+  | 'demotion_heavy'      // MLFQ: most processes demoted to lowest queue
+  | 'boost_dependency';   // MLFQ: fairness relies heavily on boost timer
 
 // Severity levels for detected flaws
 export type FlawSeverity = 'low' | 'medium' | 'high';
@@ -42,6 +45,15 @@ export interface AnalysisState {
   hasApiKey: boolean;
 }
 
+// MLQ/MLFQ-specific context sent alongside standard simulation data
+export interface MLQAnalysisContext {
+  queueConfigs: { id: number; label: string; algorithm: string; timeQuantum: number }[];
+  perQueueStats: { queueId: number; label: string; processCount: number; avgWaitingTime: number }[];
+  contextSwitchCount?: number;        // MLQ queue-switch count
+  boostTimerLimit?: number;           // MLFQ only
+  totalBoosts?: number;               // MLFQ only
+}
+
 // Data sent to LLM for analysis
 export interface SimulationDataForAnalysis {
   algorithm: AlgorithmType;
@@ -73,6 +85,7 @@ export interface SimulationDataForAnalysis {
     totalTime: number;
     contextSwitches: number;
   };
+  mlqContext?: MLQAnalysisContext; // Present for MLQ/MLFQ simulations
 }
 
 // Flaw type metadata for UI display
@@ -106,6 +119,21 @@ export const FLAW_TYPE_INFO: Record<FlawType, { label: string; icon: string; col
     label: 'Quantum Inefficiency',
     icon: '📊',
     color: 'blue',
+  },
+  queue_starvation: {
+    label: 'Queue Starvation',
+    icon: '🚫',
+    color: 'red',
+  },
+  demotion_heavy: {
+    label: 'Excessive Demotion',
+    icon: '⬇️',
+    color: 'orange',
+  },
+  boost_dependency: {
+    label: 'Boost Dependency',
+    icon: '🔄',
+    color: 'amber',
   },
 };
 

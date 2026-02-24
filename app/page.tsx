@@ -130,6 +130,9 @@ export default function Home() {
 
                 {/* Process table below */}
                 <ProcessTable />
+
+                {/* AI Flaw Analysis */}
+                <FlawAnalysis />
               </>
             ) : isMlfqMode ? (
               <>
@@ -185,6 +188,9 @@ export default function Home() {
 
                 {/* Process table below */}
                 <ProcessTable />
+
+                {/* AI Flaw Analysis */}
+                <FlawAnalysis />
               </>
             ) : (
               <>

@@ -20,7 +20,7 @@ import { createProcess, getExampleProcesses, getMlqExampleProcesses, getMlfqExam
 import { executeTick, runFullSimulation } from './schedulers';
 import { mlqTick, createInitialMlqState } from './schedulers/mlq';
 import { mlfqTick, createInitialMlfqState } from './schedulers/mlfq';
-import { AnalysisResult } from './analysis/types';
+import { AnalysisResult, MLQAnalysisContext } from './analysis/types';
 import { analyzeSimulation, prepareSimulationData } from './analysis/openai';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -366,6 +366,45 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     try {
       const stats = calculateStatistics(state.processes, state.currentTime, state.ganttChart);
 
+      // Build MLQ/MLFQ-specific context if applicable
+      let mlqContext: MLQAnalysisContext | undefined;
+
+      if (state.isMlqMode && state.mlqSimState) {
+        const sim = state.mlqSimState;
+        const perQueueStats = state.mlqQueues.map(q => {
+          const queueProcesses = state.processes.filter(p => p.queueLevel === q.id);
+          const avgWait = queueProcesses.length > 0
+            ? queueProcesses.reduce((sum, p) => sum + p.waitingTime, 0) / queueProcesses.length
+            : 0;
+          return { queueId: q.id, label: q.label, processCount: queueProcesses.length, avgWaitingTime: avgWait };
+        });
+        mlqContext = {
+          queueConfigs: state.mlqQueues.map(q => ({ id: q.id, label: q.label, algorithm: q.algorithm, timeQuantum: q.timeQuantum })),
+          perQueueStats,
+          contextSwitchCount: sim.contextSwitchCount,
+        };
+      } else if (state.isMlfqMode && state.mlfqSimState) {
+        const sim = state.mlfqSimState;
+        // For MLFQ, compute per-queue stats based on final queueLevel of each process
+        const mlfqQueueIds = [0, 1, 2] as const;
+        const perQueueStats = mlfqQueueIds.map(qId => {
+          const qConfig = state.mlfqQueues.find(q => q.id === qId);
+          const queueProcesses = state.processes.filter(p => p.queueLevel === qId);
+          const avgWait = queueProcesses.length > 0
+            ? queueProcesses.reduce((sum, p) => sum + p.waitingTime, 0) / queueProcesses.length
+            : 0;
+          return { queueId: qId, label: qConfig?.label || `Q${qId}`, processCount: queueProcesses.length, avgWaitingTime: avgWait };
+        });
+        // Calculate total boosts: boostTimerLimit - boostTimeRemaining tells ticks elapsed since last boost
+        const totalBoosts = Math.floor((sim.currentTime) / state.boostTimerLimit);
+        mlqContext = {
+          queueConfigs: state.mlfqQueues.map(q => ({ id: q.id, label: q.label, algorithm: 'rr', timeQuantum: q.timeQuantum })),
+          perQueueStats,
+          boostTimerLimit: state.boostTimerLimit,
+          totalBoosts,
+        };
+      }
+
       const simulationData = prepareSimulationData(
         state.algorithm,
         state.processes.map(p => ({
@@ -381,7 +420,8 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         })),
         state.ganttChart,
         stats,
-        state.algorithm === 'rr' ? state.timeQuantum : undefined
+        state.algorithm === 'rr' ? state.timeQuantum : undefined,
+        mlqContext
       );
 
       const result = await analyzeSimulation(simulationData);
@@ -585,6 +625,12 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         runningProcess: newState.runningProcess,
         completedProcesses: newState.completedProcesses,
       });
+
+      // Automatically run AI analysis after MLQ simulation completes
+      setTimeout(() => {
+        get().runAnalysis();
+      }, 100);
+
       return;
     }
 
@@ -760,6 +806,12 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         runningProcess: newState.runningProcess,
         completedProcesses: newState.completedProcesses,
       });
+
+      // Automatically run AI analysis after MLFQ simulation completes
+      setTimeout(() => {
+        get().runAnalysis();
+      }, 100);
+
       return;
     }
 
